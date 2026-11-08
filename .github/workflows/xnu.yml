@@ -69,6 +69,23 @@ jobs:
           xcodebuild -version
           xcrun --find iig
 
+      - name: Kernel Debug Kit (retried; build.sh downloads it once and gives up)
+        run: |
+          case "$MACOS_VERSION" in
+          26.5) KDK_NAME='Kernel Debug Kit 26.5 build 25F71' KDKROOT=/Library/Developer/KDKs/KDK_26.5_25F71.kdk ;;
+          *) echo "no KDK pinned for $MACOS_VERSION"; exit 0 ;;
+          esac
+          [ -d "$KDKROOT" ] && exit 0
+          URL=$(curl -sS --retry 5 "https://raw.githubusercontent.com/dortania/KdkSupportPkg/gh-pages/manifest.json" |
+                jq -r --arg n "$KDK_NAME" '.[] | select(.name==$n) | .url')
+          echo "$KDK_NAME: $URL"
+          curl -fL --retry 20 --retry-all-errors --retry-delay 30 --connect-timeout 60 --max-time 3600 -o /tmp/KDK.dmg "$URL"
+          hdiutil attach /tmp/KDK.dmg
+          sudo mkdir -p /Library/Developer/KDKs && sudo chmod 755 /Library/Developer/KDKs
+          sudo installer -pkg '/Volumes/Kernel Debug Kit/KernelDebugKit.pkg' -target /
+          hdiutil detach '/Volumes/Kernel Debug Kit'
+          ls -la /Library/Developer/KDKs
+
       - name: Build
         working-directory: dxb
         env:
