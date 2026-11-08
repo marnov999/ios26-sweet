@@ -59038,10 +59038,10 @@ index 0000000..4a790c2
 +#endif /* _ARM64_PPL_UAT_H_ */
 diff --git a/osfmk/arm64/sweet_early.c b/osfmk/arm64/sweet_early.c
 new file mode 100644
-index 0000000..6928957
+index 0000000..2b883f3
 --- /dev/null
 +++ b/osfmk/arm64/sweet_early.c
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,155 @@
 +/*
 + * Redmi Note 10 Pro bootstrap console. No allocation, locks, ADT parsing or
 + * per-CPU state: panic() can reach this before a current thread exists.
@@ -59185,6 +59185,18 @@ index 0000000..6928957
 +	__asm__ volatile("dsb sy" ::: "memory");
 +}
 +#endif /* SWEET */
++
++#include <arm/machine_routines.h>
++
++/*
++ * Apple's per-SoC library answers this from the fuses; xnu-12377's sysctl setup asks it
++ * (eng_sample_dev_fused). The iPhone this stands in for is a production device.
++ */
++boolean_t
++ml_device_is_prod_fused(void)
++{
++	return TRUE;
++}
 diff --git a/osfmk/arm64/sweet_early.h b/osfmk/arm64/sweet_early.h
 new file mode 100644
 index 0000000..d7a25f2
