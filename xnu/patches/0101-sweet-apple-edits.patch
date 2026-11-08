@@ -469,7 +469,7 @@ index dfb3a45..e010821 100644
  #if SOCKETS
  
 diff --git a/bsd/kern/kern_trustcache.c b/bsd/kern/kern_trustcache.c
-index 4b1e8a9..eea22c8 100644
+index 4b1e8a9..2a6818b 100644
 --- a/bsd/kern/kern_trustcache.c
 +++ b/bsd/kern/kern_trustcache.c
 @@ -579,6 +579,21 @@ trust_cache_runtime_init(void)
@@ -494,7 +494,7 @@ index 4b1e8a9..eea22c8 100644
  	/* Image4 interface needs to be available */
  	if (img4if == NULL) {
  		panic("image4 interface not available");
-@@ -809,6 +824,13 @@ check_trust_cache_runtime_for_uuid(
+@@ -809,6 +824,12 @@ check_trust_cache_runtime_for_uuid(
  		return KERN_INVALID_ARGUMENT;
  	}
  
@@ -504,11 +504,10 @@ index 4b1e8a9..eea22c8 100644
 +	}
 +#endif
 +
-+#if   PMAP_CS_PPL_MONITOR
  #if CONFIG_SPTM
  	ret = txm_check_trust_cache_runtime_for_uuid(check_uuid);
  #elif PMAP_CS_PPL_MONITOR
-@@ -931,6 +953,12 @@ load_trust_cache_with_type(
+@@ -931,6 +952,12 @@ load_trust_cache_with_type(
  		}
  	}
  
@@ -521,7 +520,7 @@ index 4b1e8a9..eea22c8 100644
  	/*
  	 * If we don't have an external manifest provided, we expect the img4_object to have
  	 * the manifest embedded. In this case, we need to extract the different artifacts
-@@ -1049,6 +1077,13 @@ load_legacy_trust_cache(
+@@ -1049,6 +1076,12 @@ load_legacy_trust_cache(
  		panic("overflow on the module: %p | %lu", module_data, module_size);
  	}
  
@@ -531,11 +530,10 @@ index 4b1e8a9..eea22c8 100644
 +	}
 +#endif
 +
-+#if   PMAP_CS_PPL_MONITOR
  #if CONFIG_SPTM
  	ret = txm_load_legacy_trust_cache(module_data, module_size);
  #elif PMAP_CS_PPL_MONITOR
-@@ -1079,6 +1114,16 @@ query_trust_cache(
+@@ -1079,6 +1112,15 @@ query_trust_cache(
  		return KERN_INVALID_ARGUMENT;
  	}
  
@@ -548,11 +546,10 @@ index 4b1e8a9..eea22c8 100644
 +	}
 +#endif
 +
-+#if   PMAP_CS_PPL_MONITOR
  #if CONFIG_SPTM
  	ret = txm_query_trust_cache(query_type, cdhash, query_token);
  #elif PMAP_CS_PPL_MONITOR
-@@ -1314,6 +1359,12 @@ static_trust_cache_capabilities(
+@@ -1314,6 +1356,12 @@ static_trust_cache_capabilities(
  	*capabilities0_ret = kTCCapabilityNone;
  	*capabilities1_ret = kTCCapabilityNone;
  
@@ -2272,10 +2269,10 @@ index 1588830..945046a 100644
   *	void FlushPoC_Dcache(void)
   *
 diff --git a/osfmk/arm64/cpu.c b/osfmk/arm64/cpu.c
-index 53f9ce5..a8cc5f0 100644
+index 53f9ce5..db3bb0b 100644
 --- a/osfmk/arm64/cpu.c
 +++ b/osfmk/arm64/cpu.c
-@@ -934,6 +934,19 @@ cpu_start(int cpu)
+@@ -934,6 +934,18 @@ cpu_start(int cpu)
  
  		flush_dcache((vm_offset_t)&CpuDataEntries[cpu], sizeof(cpu_data_entry_t), FALSE);
  		flush_dcache((vm_offset_t)cpu_data_ptr, sizeof(cpu_data_t), FALSE);
@@ -2287,7 +2284,6 @@ index 53f9ce5..a8cc5f0 100644
 +		CleanPoC_DcacheRegion_Force((vm_offset_t)cpu_data_ptr, sizeof(cpu_data_t));
 +		CleanPoC_DcacheRegion_Force((vm_offset_t)&ResetHandlerData, sizeof(ResetHandlerData));
 +		CleanPoC_DcacheRegion_Force((vm_offset_t)BootArgs, sizeof(*BootArgs));
-+		CleanPoC_DcacheRegion_Force((vm_offset_t)&sysreg_restore, sizeof(sysreg_restore));
 +		CleanPoC_DcacheRegion_Force((vm_offset_t)&cpu_ttep, sizeof(cpu_ttep));
 +		CleanPoC_DcacheRegion_Force((vm_offset_t)bootstrap_pagetables, BOOTSTRAP_TABLE_SIZE);
 +		__builtin_arm_dsb(DSB_SY);
@@ -2295,7 +2291,7 @@ index 53f9ce5..a8cc5f0 100644
  #if CONFIG_SPTM
  		/**
  		 * On SPTM devices, CTRR is configured entirely by the SPTM. Due to this, this logic
-@@ -971,6 +984,21 @@ cpu_start(int cpu)
+@@ -971,6 +983,21 @@ cpu_start(int cpu)
  }
  
  
@@ -2841,7 +2837,7 @@ index f4d148b..3118993 100644
  
  /* I-Cache. */
 diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
-index 0554aa8..1524d89 100644
+index 0554aa8..a50b5dc 100644
 --- a/osfmk/arm64/sleh.c
 +++ b/osfmk/arm64/sleh.c
 @@ -32,6 +32,7 @@
@@ -2965,9 +2961,9 @@ index 0554aa8..1524d89 100644
 +	if (intid == sweet_vtimer_intid) {
 +		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_TIMER);
 +		cdp->cpu_decrementer = -1; /* Large */
-+		INTERRUPT_MASKED_DEBUG_START(rtclock_intr, DBG_INTR_TYPE_TIMER);
++		ml_interrupt_masked_debug_start(rtclock_intr, DBG_INTR_TYPE_TIMER);
 +		rtclock_intr(TRUE);
-+		INTERRUPT_MASKED_DEBUG_END();
++		ml_interrupt_masked_debug_end();
 +		__builtin_arm_wsr64("ICC_EOIR1_EL1", iar);
 +	} else if (intid < 16) {
 +		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_IPI);
@@ -3165,10 +3161,27 @@ index 6aa6fe4..e37dec7 100644
  #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
  	/* Watchtower
 diff --git a/osfmk/conf/files.arm64 b/osfmk/conf/files.arm64
-index 878b515..defad01 100644
+index 878b515..5fa2328 100644
 --- a/osfmk/conf/files.arm64
 +++ b/osfmk/conf/files.arm64
-@@ -52,6 +52,7 @@ osfmk/arm64/dbgwrap.c		standard
+@@ -35,10 +35,12 @@ osfmk/arm64/WKdmCompress_4k.s	standard
+ osfmk/arm64/WKdmData.s		standard
+ osfmk/arm64/lz4_decode_arm64.s  standard
+ osfmk/arm64/lz4_encode_arm64.s  standard
+-osfmk/arm64/amcc_rorgn_ppl.c optional nos_arm_asm config_pmap_ppl
+-osfmk/arm64/amcc_rorgn_ppl_amcc.c optional nos_arm_asm config_pmap_ppl
+-osfmk/arm64/amcc_rorgn_common.c optional nos_arm_asm
+-osfmk/arm64/amcc_rorgn_pv_ctrr.c optional nos_arm_asm
++# SWEET: Apple's memory-controller read-only region (AMCC/CTRR) is not on Qualcomm SoCs, and two of these
++# four are not in the public source; none is built for nos_arm_asm (as hackios-redmi-k90 does).
++#osfmk/arm64/amcc_rorgn_ppl.c optional nos_arm_asm config_pmap_ppl
++#osfmk/arm64/amcc_rorgn_ppl_amcc.c optional nos_arm_asm config_pmap_ppl
++#osfmk/arm64/amcc_rorgn_common.c optional nos_arm_asm
++#osfmk/arm64/amcc_rorgn_pv_ctrr.c optional nos_arm_asm
+ osfmk/arm64/bcopy.s standard
+ osfmk/arm64/bzero.s standard
+ osfmk/arm/caches.c		standard
+@@ -52,6 +54,7 @@ osfmk/arm64/dbgwrap.c		standard
  osfmk/arm/arm_timer.c		standard
  osfmk/arm/arm_init.c	optional config_pmap_ppl
  osfmk/arm64/arm_vm_init.c	optional config_pmap_ppl
@@ -3265,7 +3278,7 @@ index 48f9405..e816c9f 100644
  	read_lbr();
  #endif
 diff --git a/osfmk/kern/exception.c b/osfmk/kern/exception.c
-index 29d7dbe..8472075 100644
+index 29d7dbe..1b6c62f 100644
 --- a/osfmk/kern/exception.c
 +++ b/osfmk/kern/exception.c
 @@ -78,6 +78,7 @@
@@ -3276,12 +3289,14 @@ index 29d7dbe..8472075 100644
  #include <kern/processor.h>
  #include <kern/sched.h>
  #include <kern/sched_prim.h>
-@@ -960,6 +961,247 @@ exception_triage(
+@@ -960,6 +961,231 @@ exception_triage(
  	return exception_triage_thread(exception, code, codeCnt, thread);
  }
  
 +#if defined(ARM64_BOARD_CONFIG_SWEET)
 +#include <vm/vm_shared_region.h>
++#include <vm/vm_shared_region_xnu.h>
++#include <vm/vm_map_internal.h>
 +#include <arm/thread.h>
 +
 +/*
@@ -3333,25 +3348,7 @@ index 29d7dbe..8472075 100644
 +	}
 +	printf("%s\n", line);
 +
-+	if (sig == 11 || sig == 10) {
-+		/* Which mapping the faulting address is in, or which two it falls between. */
-+		uint64_t far = (uint64_t)saved_state64(ss)->far;
-+		vm_map_t map = current_map();
-+		vm_map_entry_t entry;
-+		vm_map_lock_read(map);
-+		bool inside = vm_map_lookup_entry(map, (vm_map_offset_t)far, &entry);
-+		for (int i = 0; i < 2 && entry != vm_map_to_entry(map); i++) {
-+			printf("CRASH %s map%s 0x%llx-0x%llx prot %d/%d tag %d\n", name,
-+			    inside && i == 0 ? " (far inside)" : (i == 0 ? " before far" : " after far"),
-+			    (uint64_t)entry->vme_start, (uint64_t)entry->vme_end, entry->protection,
-+			    entry->max_protection, (int)VME_ALIAS(entry));
-+			if (inside) {
-+				break;
-+			}
-+			entry = entry->vme_next;
-+		}
-+		vm_map_unlock_read(map);
-+	}
++	/* (the mapping around the faulting address: vm_map_lookup_entry is not exported on xnu-12377) */
 +	if (sig == 6 || sig == 5) {
 +		sweet_crash_strings(name);
 +	}

@@ -5917,10 +5917,10 @@ index 0000000..a7f0687
 +}
 diff --git a/bsd/dev/hakios.lx.c b/bsd/dev/hakios.lx.c
 new file mode 100644
-index 0000000..3381b68
+index 0000000..652ca68
 --- /dev/null
 +++ b/bsd/dev/hakios.lx.c
-@@ -0,0 +1,589 @@
+@@ -0,0 +1,590 @@
 +/*
 + * Darwin-on-hakios: the kernel's side of the Wi-Fi driver's object.
 + *
@@ -5953,6 +5953,7 @@ index 0000000..3381b68
 +#include <sys/systm.h>
 +#include <vm/memory_types.h>
 +#include <vm/vm_kern.h>
++#include <vm/vm_kern_xnu.h>
 +
 +extern vm_offset_t ml_io_map_unmappable(vm_offset_t phys_addr, vm_size_t size, unsigned int flags);
 +extern uint64_t kvtophys(vm_offset_t va);       /* pmap_paddr_t */
@@ -8292,10 +8293,10 @@ index 0000000..ffe4a38
 +}
 diff --git a/bsd/dev/sweet_camera.c b/bsd/dev/sweet_camera.c
 new file mode 100644
-index 0000000..bcf3ab3
+index 0000000..464d3de
 --- /dev/null
 +++ b/bsd/dev/sweet_camera.c
-@@ -0,0 +1,3699 @@
+@@ -0,0 +1,3700 @@
 +/*
 + * SWEET camera: the Mi 9T's (davinci, SM7150 "sdmmagpie", Titan 175) cameras for iOS.
 + * DRAFT -- not built, not run. Port of HackiOS's bsd/dev/redwood_camera.c (OOSEX GANG, APSL 2.0,
@@ -8362,6 +8363,7 @@ index 0000000..bcf3ab3
 +#include <kern/thread.h>
 +#include <kern/sched_prim.h>
 +#include <vm/vm_kern.h>
++#include <vm/vm_kern_xnu.h>
 +#include <vm/pmap.h>
 +#include <libkern/libkern.h>
 +#include <machine/machine_routines.h>
@@ -12086,10 +12088,10 @@ index 0000000..9c5c803
 +#endif /* ARM64_BOARD_CONFIG_SWEET */
 diff --git a/bsd/dev/sweet_gpu.c b/bsd/dev/sweet_gpu.c
 new file mode 100644
-index 0000000..ecdbefe
+index 0000000..6daf66d
 --- /dev/null
 +++ b/bsd/dev/sweet_gpu.c
-@@ -0,0 +1,10126 @@
+@@ -0,0 +1,10127 @@
 +/*
 + * SWEET Adreno 618 (davinci / SM7150 / sdmmagpie) bring-up - Phase 0 / 0.5.
 + * Call once after the scheduler is running; all work runs on one thread.
@@ -12130,6 +12132,7 @@ index 0000000..ecdbefe
 +#include <pexpert/pexpert.h>
 +#include <vm/pmap.h>
 +#include <vm/vm_kern.h>
++#include <vm/vm_kern_xnu.h>
 +#include <mach/memory_object_types.h>   /* MAP_MEM_WCOMB, memory_object_size_t/offset_t */
 +#include <mach/vm_prot.h>
 +#include <mach/vm_inherit.h>
@@ -16472,7 +16475,7 @@ index 0000000..ecdbefe
 +	.d_reset      = eno_reset,
 +	.d_ttys       = NULL,
 +	.d_select     = eno_select,
-+	.d_mmap       = kgsl_mmap,   /* map GPUOBJ BOs to userland (turnip BO map) */
++	.d_mmap       = (mmap_fcn_t *)(void (*)(void))kgsl_mmap,   /* map GPUOBJ BOs to userland (turnip BO map) */
 +	.d_strategy   = eno_strat,
 +	.d_reserved_1 = eno_getc,
 +	.d_reserved_2 = eno_putc,
@@ -17354,7 +17357,7 @@ index 0000000..ecdbefe
 +	.d_reset      = eno_reset,
 +	.d_ttys       = NULL,
 +	.d_select     = eno_select,
-+	.d_mmap       = kgsl_mmap,   /* map GEM BOs to userland (MSM_INFO_GET_OFFSET token) */
++	.d_mmap       = (mmap_fcn_t *)(void (*)(void))kgsl_mmap,   /* map GEM BOs to userland (MSM_INFO_GET_OFFSET token) */
 +	.d_strategy   = eno_strat,
 +	.d_reserved_1 = eno_getc,
 +	.d_reserved_2 = eno_putc,
@@ -28472,10 +28475,10 @@ index 0000000..3fc91ec
 +#endif /* ARM64_BOARD_CONFIG_SWEET */
 diff --git a/bsd/dev/sweet_ufs.c b/bsd/dev/sweet_ufs.c
 new file mode 100644
-index 0000000..355b2bf
+index 0000000..1b6126a
 --- /dev/null
 +++ b/bsd/dev/sweet_ufs.c
-@@ -0,0 +1,827 @@
+@@ -0,0 +1,828 @@
 +/*
 + * SWEET internal UFS root device.
 + *
@@ -28513,6 +28516,7 @@ index 0000000..355b2bf
 +#include <arm/caches_internal.h>
 +#include <vm/pmap.h>
 +#include <vm/vm_kern.h>
++#include <vm/vm_kern_xnu.h>
 +#include <pexpert/pexpert.h>
 +#include <pexpert/device_tree.h>
 +#include <libkern/libkern.h>
@@ -29305,10 +29309,10 @@ index 0000000..355b2bf
 +#endif /* ARM64_BOARD_CONFIG_SWEET */
 diff --git a/bsd/dev/sweet_usb.c b/bsd/dev/sweet_usb.c
 new file mode 100644
-index 0000000..b6c1a41
+index 0000000..bacc19e
 --- /dev/null
 +++ b/bsd/dev/sweet_usb.c
-@@ -0,0 +1,931 @@
+@@ -0,0 +1,932 @@
 +/*
 + * SWEET: USB bring-up, step 1 - read-only state probe.
 + *
@@ -29331,6 +29335,7 @@ index 0000000..b6c1a41
 +#include <arm/caches_internal.h>
 +#include <vm/pmap.h>
 +#include <vm/vm_kern.h>
++#include <vm/vm_kern_xnu.h>
 +#include <pexpert/pexpert.h>
 +#include <kern/locks.h>
 +#include <sys/kpi_mbuf.h>
