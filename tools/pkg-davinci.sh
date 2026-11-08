@@ -16,8 +16,8 @@ O=/home/marnov/xmiphones/ios26/img
 B=$O/build-$NAME
 mkdir -p "$O" "$B"
 GH=/home/marnov/xmiphones/devtools/gh/bin/gh
-LOG=$B/ci-$RUN.log
-env -u GH_TOKEN $GH run view "$RUN" -R marnov999/ios26-sweet --log > "$LOG"
+LOG=/home/marnov/xmiphones/ios26/ci/$RUN.log     # saved by ios26/ci/errors.sh RUN
+[ -s "$LOG" ] || /home/marnov/xmiphones/ios26/ci/errors.sh "$RUN"
 for p in 0100-sweet-new-files 0101-sweet-apple-edits; do
 	grep -q "Applying patch: .*$p.patch" "$LOG" || { echo "$p not applied"; exit 1; }
 	! grep -q "Skipping patch .*$p.patch" "$LOG" || { echo "$p skipped"; exit 1; }
