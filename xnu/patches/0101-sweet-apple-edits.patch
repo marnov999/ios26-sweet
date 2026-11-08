@@ -1,0 +1,4331 @@
+diff --git a/bsd/conf/Makefile.template b/bsd/conf/Makefile.template
+index c4cbbe9..81b939e 100644
+--- a/bsd/conf/Makefile.template
++++ b/bsd/conf/Makefile.template
+@@ -44,6 +44,28 @@ CFLAGS+= -include meta_features.h -DDRIVER_PRIVATE \
+         -Warray-bounds-pointer-arithmetic
+ SFLAGS+= -include meta_features.h
+ 
++# This provider is built into SWEET; other boards use their normal kext.
++ifeq ($(CURRENT_MACHINE_CONFIG),SWEET)
++SWEET_PTHREAD_ROOT = $(SRCROOT)/bsd/pthread/sweet_libpthread
++SWEET_PTHREAD_INC = -I$(SWEET_PTHREAD_ROOT) -I$(SWEET_PTHREAD_ROOT)/private -I$(SWEET_PTHREAD_ROOT)/include
++sweet_pthread_init.o_INCFLAGS = $(SWEET_PTHREAD_INC)
++sweet_pthread_support.o_INCFLAGS = $(SWEET_PTHREAD_INC)
++sweet_pthread_synch.o_INCFLAGS = $(SWEET_PTHREAD_INC)
++
++# Apple OSS HFS built in (bsd/sweet_hfs): compiled like the kext, see sweet_hfs_compat.h.
++# The compat header must come after the kernel's -D options, hence _CFLAGS_ADD.
++SWEET_HFS_ROOT = $(SRCROOT)/bsd/sweet_hfs
++SWEET_HFS_OBJS = BTree.o BTreeAllocate.o BTreeMiscOps.o BTreeNodeOps.o BTreeNodeReserve.o BTreeScanner.o BTreeTreeOps.o BTreeWrapper.o CatalogUtilities.o FileExtentMapping.o FileIDsServices.o MacOSStubs.o UnicodeWrappers.o VolumeAllocation.o hfs_attrlist.o hfs_btreeio.o hfs_catalog.o hfs_chash.o hfs_cnode.o hfs_cprotect.o hfs_endian.o hfs_extents.o hfs_fsinfo.o hfs_hotfiles.o hfs_journal.o hfs_link.o hfs_lookup.o hfs_notification.o hfs_quota.o hfs_readwrite.o hfs_resize.o hfs_search.o hfs_vfsops.o hfs_vfsutils.o hfs_vnops.o hfs_xattr.o rangelist.o hfs_encodinghint.o hfs_encodings.o sweet_hfs_iokit.o
++$(foreach o,$(SWEET_HFS_OBJS),$(eval $(o)_CFLAGS_ADD += -include $(SWEET_HFS_ROOT)/sweet_hfs_compat.h -I$(SWEET_HFS_ROOT) -I$(SWEET_HFS_ROOT)/core))
++# HFSEncodings is a separate kext on Apple with its own allocation counter.
++hfs_encodings.o_CFLAGS_ADD += -Dhfs_allocated=hfs_encodings_allocated
++hfs_encodinghint.o_CFLAGS_ADD += -Dhfs_allocated=hfs_encodings_allocated
++# MIUI-exact battery %: the algorithm keeps its float math in integer soft-float; no FP/SIMD registers at all.
++sweet_qg.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_qg_algo.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_qg_softfloat.o_CFLAGS_ADD += -mgeneral-regs-only
++endif
++
+ #
+ # Directories for mig generated files
+ #
+diff --git a/bsd/conf/files b/bsd/conf/files
+index 60d8aa6..66f12b4 100644
+--- a/bsd/conf/files
++++ b/bsd/conf/files
+@@ -103,6 +103,26 @@ bsd/dev/dtrace/fasttrap.c		optional config_dtrace
+ bsd/dev/random/randomdev.c		standard
+ 
+ bsd/dev/memdev.c			standard
++bsd/dev/sweet_ufs.c			standard
++bsd/dev/sweet_sample.c			standard
++bsd/dev/sweet_keys.c			standard
++bsd/dev/sweet_touch.c			standard
++bsd/dev/sweet_rpmh.c			standard
++bsd/dev/sweet_spmi.c			standard
++bsd/dev/sweet_qg.c			standard
++bsd/dev/sweet_qg_algo.c			standard
++bsd/dev/sweet_qg_softfloat.c		standard
++bsd/dev/sweet_usb.c			standard
++bsd/dev/sweet_gpu.c			standard
++bsd/dev/sweet_dpu.c			standard
++bsd/dev/sweet_prof.c			standard
++bsd/dev/sweet_camera.c			standard
++bsd/dev/hakios.qmi.c			standard
++bsd/dev/hakios.lx.c			standard
++bsd/dev/hakios.net.c			standard
++bsd/dev/hakios.sta.c			standard
++bsd/dev/hakios.apple80211.c		standard
++bsd/dev/sweet_wifi.c			standard
+ bsd/dev/mem.c				standard
+ bsd/dev/munge.c 			optional config_requires_u32_munging
+ bsd/dev/unix_startup.c			standard
+@@ -380,6 +400,9 @@ bsd/security/audit/audit_syscalls.c		standard
+ bsd/security/audit/audit_worker.c		optional config_audit
+ 
+ bsd/pthread/pthread_shims.c		standard
++bsd/pthread/sweet_pthread_init.c	standard
++bsd/pthread/sweet_pthread_support.c	standard
++bsd/pthread/sweet_pthread_synch.c	standard
+ bsd/pthread/pthread_priority.c		standard
+ bsd/pthread/pthread_workqueue.c		standard
+ 
+@@ -398,6 +421,50 @@ bsd/kern/kern_core.c			optional config_ucoredump
+ bsd/kern/kern_credential.c		standard
+ bsd/kern/kern_crossarch.c		standard
+ bsd/kern/kern_cs.c			standard
++bsd/kern/sweet_amfi.c			standard
++
++# Apple OSS hfs-627.100.6, staged by xnu/patches/0026-stage-hfs.sh
++bsd/sweet_hfs/core/BTree.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeAllocate.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeMiscOps.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeNodeOps.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeNodeReserve.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeScanner.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeTreeOps.c		optional sweet_hfs
++bsd/sweet_hfs/core/BTreeWrapper.c		optional sweet_hfs
++bsd/sweet_hfs/core/CatalogUtilities.c		optional sweet_hfs
++bsd/sweet_hfs/core/FileExtentMapping.c		optional sweet_hfs
++bsd/sweet_hfs/core/FileIDsServices.c		optional sweet_hfs
++bsd/sweet_hfs/core/MacOSStubs.c		optional sweet_hfs
++bsd/sweet_hfs/core/UnicodeWrappers.c		optional sweet_hfs
++bsd/sweet_hfs/core/VolumeAllocation.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_attrlist.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_btreeio.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_catalog.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_chash.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_cnode.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_cprotect.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_endian.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_extents.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_fsinfo.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_hotfiles.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_journal.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_link.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_lookup.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_notification.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_quota.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_readwrite.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_resize.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_search.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_vfsops.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_vfsutils.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_vnops.c		optional sweet_hfs
++bsd/sweet_hfs/core/hfs_xattr.c		optional sweet_hfs
++bsd/sweet_hfs/core/rangelist.c		optional sweet_hfs
++bsd/sweet_hfs/hfs_encodings/hfs_encodinghint.c		optional sweet_hfs
++bsd/sweet_hfs/hfs_encodings/hfs_encodings.c		optional sweet_hfs
++bsd/sweet_hfs/sweet_hfs_iokit.c		optional sweet_hfs
++
+ bsd/kern/kern_csr.c			optional config_csr
+ bsd/kern/kern_debug.c			standard
+ bsd/kern/kern_symfile.c			standard
+diff --git a/bsd/dev/arm/systemcalls.c b/bsd/dev/arm/systemcalls.c
+index 0906700..7bd3f11 100644
+--- a/bsd/dev/arm/systemcalls.c
++++ b/bsd/dev/arm/systemcalls.c
+@@ -29,6 +29,7 @@
+ #include <sys/sysproto.h>
+ #include <sys/kauth.h>
+ #include <sys/bitstring.h>
++#include <kern/startup.h>
+ 
+ #include <security/audit/audit.h>
+ 
+@@ -79,6 +80,93 @@ __XNU_PRIVATE_EXTERN    int             syscalls_log[SYS_MAXSYSCALL];
+ extern int mach_trap_count;
+ #endif
+ 
++/*
++ * SWEET: boot-arg sweettrace=NAME[,NAME...] logs every system call of the processes so named
++ * (p_comm, the first 16 characters) that fails, with its errno and, for the calls that take paths, the path(s):
++ *     SWEET TRACE: MobileNotes[491] mkdir("/private/var/...") = 1 EPERM
++ * One process's failures and nothing else, to find the call an obfuscated or Swift binary gives
++ * up on (HackiOS's systrace= does the same for every call). The error-return path only, so a
++ * process not named costs one byte compare per call.
++ */
++static TUNABLE_STR(sweet_trace_name, 96, "sweettrace", "");
++
++static bool
++sweet_trace_named(const char *comm)
++{
++	size_t len = strnlen(comm, MAXCOMLEN + 1);
++	for (const char *t = sweet_trace_name; *t != '\0';) {
++		const char *end = strchr(t, ',');
++		size_t n = end ? (size_t)(end - t) : strlen(t);
++		if (n == len && strncmp(t, comm, n) == 0) {
++			return true;
++		}
++		if (end == NULL) {
++			break;
++		}
++		t = end + 1;
++	}
++	return false;
++}
++
++static int
++sweet_trace_path_args(unsigned short code, int *second)
++{
++	*second = -1;
++	switch (code) {
++	case SYS_link: case SYS_rename: case SYS_symlink:
++		*second = 1;
++		return 0;
++	case SYS_open: case SYS_open_nocancel: case SYS_unlink: case SYS_chdir: case SYS_mknod:
++	case SYS_chmod: case SYS_chown: case SYS_access: case SYS_readlink: case SYS_mkdir:
++	case SYS_rmdir: case SYS_utimes: case SYS_pathconf: case SYS_truncate: case SYS_getattrlist:
++	case SYS_setattrlist: case SYS_getxattr: case SYS_setxattr: case SYS_removexattr:
++	case SYS_listxattr: case SYS_stat64: case SYS_lstat64: case SYS_statfs64: case SYS_lchown:
++	case SYS_chflags: case SYS_mkfifo: case SYS_stat: case SYS_lstat: case SYS_statfs:
++	case SYS_getattrlistbulk:
++		return code == SYS_getattrlistbulk ? -1 : 0;
++	case SYS_openat: case SYS_openat_nocancel: case SYS_mkdirat: case SYS_fstatat64:
++	case SYS_unlinkat: case SYS_faccessat: case SYS_getattrlistat: case SYS_readlinkat:
++	case SYS_fchmodat: case SYS_fchownat: case SYS_fstatat: case SYS_setattrlistat:
++		return 1;
++	case SYS_renameat: case SYS_renameatx_np:
++		*second = 3;
++		return 1;
++	case SYS_linkat:
++		*second = 3;
++		return 1;
++	case SYS_symlinkat:
++		*second = 2;
++		return 0;
++	default:
++		return -1;
++	}
++}
++
++static void
++sweet_trace_fail(struct proc *p, unsigned short code, struct uthread *ut, int error)
++{
++	static char path[2][1024];
++	size_t n;
++	int second, first;
++
++	if (!sweet_trace_named(p->p_comm)) {
++		return;
++	}
++	path[0][0] = path[1][0] = '\0';
++	first = sweet_trace_path_args(code, &second);
++	if (first >= 0 && copyinstr((user_addr_t)ut->uu_arg[first], path[0], sizeof(path[0]), &n) != 0) {
++		strlcpy(path[0], "?", sizeof(path[0]));
++	}
++	if (second >= 0 && copyinstr((user_addr_t)ut->uu_arg[second], path[1], sizeof(path[1]), &n) != 0) {
++		strlcpy(path[1], "?", sizeof(path[1]));
++	}
++	printf("SWEET TRACE: %s[%d] syscall %u(%s%s%s%s%s%s) args %#llx %#llx %#llx = errno %d\n", p->p_comm,
++	    proc_pid(p), code, first >= 0 ? "\"" : "", path[0], first >= 0 ? "\"" : "",
++	    second >= 0 ? ", \"" : "", path[1], second >= 0 ? "\"" : "",
++	    (unsigned long long)ut->uu_arg[0], (unsigned long long)ut->uu_arg[1],
++	    (unsigned long long)ut->uu_arg[2], error);
++}
++
+ /*
+  * Function:	unix_syscall
+  *
+@@ -180,6 +268,10 @@ unix_syscall(
+ 	AUDIT_SYSCALL_ENTER(code, proc, uthread);
+ 	error = (*(callp->sy_call))(proc, &uthread->uu_arg[0], &(uthread->uu_rval[0]));
+ 	AUDIT_SYSCALL_EXIT(code, proc, uthread, error);
++	if (__improbable(sweet_trace_name[0] != '\0') && error != 0 && error != EJUSTRETURN &&
++	    error != ERESTART) {
++		sweet_trace_fail(proc, code, uthread, error);
++	}
+ 
+ #if CONFIG_MACF
+ skip_syscall:
+diff --git a/bsd/dev/mem.c b/bsd/dev/mem.c
+index c64e636..291a546 100644
+--- a/bsd/dev/mem.c
++++ b/bsd/dev/mem.c
+@@ -153,6 +153,44 @@ mmioctl(dev_t dev, u_long cmd, __unused caddr_t data,
+ 	return 0;
+ }
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET: daemons started by launchd write stdout/stderr to /dev/null, and
++ * pointing a launchd job at /dev/console stops it from launching at all
++ * (backboardd, v8 image). Instead, what the processes named in boot-arg
++ * sweetnull (comma separated, default "backboardd,SpringBoard") write to
++ * /dev/null goes to the console (and so to the persistent log) as
++ * "|name| text". sweetnull=- turns it off.
++ */
++static char sweet_null_names[128];
++static int sweet_null_parsed;
++
++static bool
++sweet_null_tee(char *name, size_t len)
++{
++	if (!sweet_null_parsed) {
++		if (!PE_parse_boot_argn("sweetnull", sweet_null_names, sizeof(sweet_null_names))) {
++			strlcpy(sweet_null_names, "backboardd,SpringBoard", sizeof(sweet_null_names));
++		}
++		sweet_null_parsed = 1;
++	}
++	proc_selfname(name, (int)len);
++	size_t n = strlen(name);
++	for (const char *t = sweet_null_names; *t;) {
++		const char *end = strchr(t, ',');
++		size_t tl = end ? (size_t)(end - t) : strlen(t);
++		if (tl == n && n > 0 && strncmp(t, name, n) == 0) {
++			return true;
++		}
++		if (!end) {
++			break;
++		}
++		t = end + 1;
++	}
++	return false;
++}
++#endif
++
+ int
+ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw)
+ {
+@@ -216,6 +254,22 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw)
+ 			if (rw == UIO_READ) {
+ 				return 0;
+ 			}
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++			{
++				char name[32];
++				if (sweet_null_tee(name, sizeof(name))) {
++					char buf[256];
++					c = MIN(uio_curriovlen(uio), sizeof(buf));
++					error = uiomove(buf, (int)c, uio);
++					if (error) {
++						break;
++					}
++					printf("|%s| %.*s%s", name, (int)c, buf,
++					    (c > 0 && buf[c - 1] == '\n') ? "" : "\n");
++					continue;
++				}
++			}
++#endif
+ 			c = uio_curriovlen(uio);
+ 
+ 			error = 0; /* Always succeeds, always consumes all input */
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index ffe7ce0..d97be0a 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -701,6 +701,18 @@ bsd_init(void)
+ 	bsd_init_kprintf("calling vfsinit\n");
+ 	vfsinit();
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/* AMFI's MAC policy is built in on SWEET (bsd/kern/sweet_amfi.c). */
++	extern void sweet_amfi_policy_register(void);
++	sweet_amfi_policy_register();
++#endif
++
++#if SWEET_HFS
++	/* HFS is built in on SWEET: register it like its kext would, before mounting root. */
++	extern void sweet_hfs_register(void);
++	sweet_hfs_register();
++#endif
++
+ #if CONFIG_PROC_UUID_POLICY
+ 	/* Initial proc_uuid_policy subsystem */
+ 	bsd_init_kprintf("calling proc_uuid_policy_init()\n");
+@@ -947,9 +959,20 @@ bsd_init(void)
+ 		if (require_rootauth) {
+ 			/* enforce sealedness */
+ 			int autherr = VNOP_IOCTL(rootvnode, FSIOC_KERNEL_ROOTAUTH, NULL, 0, vfs_context_kernel());
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++			/*
++			 * SWEET has no chain of trust to extend: the kernel itself is
++			 * booted unsigned and there is no Image4/AMFI, and its HFS root
++			 * cannot be a sealed volume. Report it instead of panicking.
++			 */
++			if (autherr) {
++				printf("SWEET: root volume is not authenticated (error %d); continuing unsealed\n", autherr);
++			}
++#else
+ 			if (autherr) {
+ 				panic("rootvp not authenticated after mounting");
+ 			}
++#endif
+ 		}
+ 	}
+ 
+diff --git a/bsd/kern/kern_core.c b/bsd/kern/kern_core.c
+index b422eaa..e939d03 100644
+--- a/bsd/kern/kern_core.c
++++ b/bsd/kern/kern_core.c
+@@ -34,6 +34,7 @@
+  */
+ #if CONFIG_COREDUMP || CONFIG_UCOREDUMP
+ 
++#include <pexpert/arm64/board_config.h>
+ #include <mach/vm_param.h>
+ #include <mach/thread_status.h>
+ #include <sys/content_protection.h>
+@@ -86,7 +87,12 @@ kern_return_t thread_getstatus(thread_t act, int flavor,
+     thread_state_t tstate, mach_msg_type_number_t *count);
+ void task_act_iterate_wth_args(task_t, void (*)(thread_t, void *), void *);
+ 
+-#ifdef SECURE_KERNEL
++#if defined(SECURE_KERNEL) || defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET: off by default (sysctl kern.coredump=1 enables it). A crashing iOS
++ * daemon maps the whole shared region, so one core is gigabytes on the root
++ * volume and takes minutes on the phone's UFS.
++ */
+ __XNU_PRIVATE_EXTERN int do_coredump = 0;       /* default: don't dump cores */
+ #else
+ __XNU_PRIVATE_EXTERN int do_coredump = 1;       /* default: dump cores */
+diff --git a/bsd/kern/kern_exec.c b/bsd/kern/kern_exec.c
+index 2467b24..89acb1c 100644
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8658,9 +8658,14 @@ process_signature(proc_t p, struct image_params *imgp)
+ 				error = EACCES;
+ 				goto done;
+ 			}
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++			/* SWEET runs every iOS binary this way: one short line per exec. */
++			printf("exec %s\n", p->p_name);
++#else
+ 			printf("Allowing spawn of iOS binary %s since it has "
+ 			    "com.apple.private.security.no-sandbox entitlement or unentitled_ios_sim_launch "
+ 			    "boot-arg set to true\n", p->p_name);
++#endif
+ 		} else if (psa->psa_platform != PLATFORM_IOS) {
+ 			/* Simulator binary spawned with wrong platform */
+ 			signature_failure_reason = os_reason_create(OS_REASON_EXEC,
+diff --git a/bsd/kern/kern_exit.c b/bsd/kern/kern_exit.c
+index b5633e4..9b6d828 100644
+--- a/bsd/kern/kern_exit.c
++++ b/bsd/kern/kern_exit.c
+@@ -2084,6 +2084,20 @@ proc_prepareexit(proc_t p, int rv, boolean_t perf_notify)
+ 		subcode = ut->uu_subcode;
+ 		etype = ut->uu_exception;
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		if (p == current_proc()) {
++			extern void sweet_crash_log(const char *, int, int, uint64_t, uint64_t);
++			sweet_crash_log(p->p_comm, proc_getpid(p), WTERMSIG(rv),
++			    ((uint64_t)ut->uu_exception << 32) | (uint32_t)ut->uu_code, ut->uu_subcode);
++			/* abort_with_payload messages (_objc_fatal, os_crash_fmt, ...) */
++			if (PROC_HAS_EXITREASON(p)) {
++				char *desc = exit_reason_get_string_desc(p->p_exit_reason);
++				printf("CRASH %s reason ns %u code 0x%llx: %s\n", p->p_comm,
++				    p->p_exit_reason->osr_namespace, p->p_exit_reason->osr_code,
++				    desc != NULL ? desc : "(none)");
++			}
++		}
++#endif
+ 		/* Defualt to EXC_CRASH if the exception is not an EXC_RESOURCE or EXC_GUARD */
+ 		if (etype != EXC_RESOURCE && etype != EXC_GUARD) {
+ 			etype = EXC_CRASH;
+diff --git a/bsd/kern/kern_mib.c b/bsd/kern/kern_mib.c
+index e67ea79..1658d85 100644
+--- a/bsd/kern/kern_mib.c
++++ b/bsd/kern/kern_mib.c
+@@ -542,7 +542,9 @@ sysctl_hw_generic(__unused struct sysctl_oid *oidp, void *arg1,
+ 		 * Deprecated variables.  We still support these for
+ 		 * backwards compatibility purposes only.
+ 		 */
+-#if XNU_TARGET_OS_OSX && defined(__arm64__)
++#if XNU_TARGET_OS_OSX && defined(__arm64__) && !defined(ARM64_BOARD_CONFIG_SWEET)
++	/* SWEET: the macOS config runs the iOS userland, which wants the
++	 * device-tree names (hw.machine iPhone10,3, hw.model D22AP). */
+ 	/* The following two are kludged for backward
+ 	 * compatibility. Use hw.product/hw.target for something
+ 	 * consistent instead. */
+diff --git a/bsd/kern/kern_proc.c b/bsd/kern/kern_proc.c
+index dfb3a45..e010821 100644
+--- a/bsd/kern/kern_proc.c
++++ b/bsd/kern/kern_proc.c
+@@ -6687,7 +6687,12 @@ out:
+ 	return error;
+ }
+ 
+-#if !XNU_TARGET_OS_OSX
++#if !XNU_TARGET_OS_OSX || defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET runs the iOS userland on the macOS config: SpringBoard calls
++ * pid_hibernate when an app leaves the foreground, and nosys (SIGSYS)
++ * killed it. Without CONFIG_FREEZE this returns 0, as on iOS.
++ */
+ /*
+  * Freeze the specified process (provided in args->pid), or find and freeze a PID.
+  * When a process is specified, this call is blocking, otherwise we wake up the
+@@ -6760,7 +6765,7 @@ out:
+ 	*ret = error;
+ 	return error;
+ }
+-#endif /* !XNU_TARGET_OS_OSX */
++#endif /* !XNU_TARGET_OS_OSX || SWEET */
+ 
+ #if SOCKETS
+ 
+diff --git a/bsd/kern/kern_trustcache.c b/bsd/kern/kern_trustcache.c
+index 4b1e8a9..eea22c8 100644
+--- a/bsd/kern/kern_trustcache.c
++++ b/bsd/kern/kern_trustcache.c
+@@ -579,6 +579,21 @@ trust_cache_runtime_init(void)
+ 	allow_legacy_caches = true;
+ #endif
+ 
++#if defined(SWEET)
++	/*
++	 * Standalone SWEET bring-up has no AppleImage4/AMFI kexts. Represent
++	 * the missing service explicitly: no caches can be loaded or matched.
++	 * Keep a NULL runtime through lockdown rather than a partially
++	 * initialized runtime that would later dereference absent callbacks.
++	 */
++	if (img4if == NULL || amfi == NULL) {
++		trust_cache_rt = NULL;
++		trust_cache_mut_rt = NULL;
++		printf("SWEET: trust caches unavailable (Image4/AMFI not installed)\n");
++		return;
++	}
++#endif
++
+ 	/* Image4 interface needs to be available */
+ 	if (img4if == NULL) {
+ 		panic("image4 interface not available");
+@@ -809,6 +824,13 @@ check_trust_cache_runtime_for_uuid(
+ 		return KERN_INVALID_ARGUMENT;
+ 	}
+ 
++#if defined(SWEET)
++	if (trust_cache_rt == NULL) {
++		return KERN_NOT_FOUND;
++	}
++#endif
++
++#if   PMAP_CS_PPL_MONITOR
+ #if CONFIG_SPTM
+ 	ret = txm_check_trust_cache_runtime_for_uuid(check_uuid);
+ #elif PMAP_CS_PPL_MONITOR
+@@ -931,6 +953,12 @@ load_trust_cache_with_type(
+ 		}
+ 	}
+ 
++#if defined(SWEET)
++	if (trust_cache_rt == NULL) {
++		return KERN_NOT_SUPPORTED;
++	}
++#endif
++
+ 	/*
+ 	 * If we don't have an external manifest provided, we expect the img4_object to have
+ 	 * the manifest embedded. In this case, we need to extract the different artifacts
+@@ -1049,6 +1077,13 @@ load_legacy_trust_cache(
+ 		panic("overflow on the module: %p | %lu", module_data, module_size);
+ 	}
+ 
++#if defined(SWEET)
++	if (trust_cache_rt == NULL) {
++		return KERN_NOT_SUPPORTED;
++	}
++#endif
++
++#if   PMAP_CS_PPL_MONITOR
+ #if CONFIG_SPTM
+ 	ret = txm_load_legacy_trust_cache(module_data, module_size);
+ #elif PMAP_CS_PPL_MONITOR
+@@ -1079,6 +1114,16 @@ query_trust_cache(
+ 		return KERN_INVALID_ARGUMENT;
+ 	}
+ 
++#if defined(SWEET)
++	if (trust_cache_rt == NULL) {
++		if (query_type >= kTCQueryTypeTotal) {
++			return KERN_INVALID_ARGUMENT;
++		}
++		return KERN_NOT_FOUND;
++	}
++#endif
++
++#if   PMAP_CS_PPL_MONITOR
+ #if CONFIG_SPTM
+ 	ret = txm_query_trust_cache(query_type, cdhash, query_token);
+ #elif PMAP_CS_PPL_MONITOR
+@@ -1314,6 +1359,12 @@ static_trust_cache_capabilities(
+ 	*capabilities0_ret = kTCCapabilityNone;
+ 	*capabilities1_ret = kTCCapabilityNone;
+ 
++#if defined(SWEET)
++	if (trust_cache_rt == NULL) {
++		return KERN_NOT_SUPPORTED;
++	}
++#endif
++
+ 	/* Ensure static trust caches have been initialized */
+ 	if (trust_cache_static_init == false) {
+ 		panic("attempted to query static trust cache capabilities without init");
+diff --git a/bsd/kern/syscalls.master b/bsd/kern/syscalls.master
+index c08a74c..c19d42f 100644
+--- a/bsd/kern/syscalls.master
++++ b/bsd/kern/syscalls.master
+@@ -650,7 +650,7 @@
+ 432	AUE_NULL	ALL	{ int audit_session_port(au_asid_t asid, user_addr_t portnamep); }
+ 433	AUE_NULL	ALL	{ int pid_suspend(int pid); }
+ 434	AUE_NULL	ALL	{ int pid_resume(int pid); }
+-#if CONFIG_EMBEDDED
++#if CONFIG_EMBEDDED || defined(ARM64_BOARD_CONFIG_SWEET)
+ 435	AUE_NULL	ALL	{ int pid_hibernate(int pid); }
+ #else
+ 435     AUE_NULL        ALL     { int nosys(void); }
+diff --git a/bsd/miscfs/mockfs/mockfs_fsnode.c b/bsd/miscfs/mockfs/mockfs_fsnode.c
+index e000126..55c851c 100644
+--- a/bsd/miscfs/mockfs/mockfs_fsnode.c
++++ b/bsd/miscfs/mockfs/mockfs_fsnode.c
+@@ -85,7 +85,7 @@ mockfs_fsnode_create(mount_t mp, uint8_t type, mockfs_fsnode_t * fsnpp)
+ 		goto done;
+ 	}
+ 
+-	*fsnpp = kalloc_type(mockfs_fsnode_t, Z_WAITOK | Z_ZERO | Z_NOFAIL);
++	*fsnpp = kalloc_type(struct mockfs_fsnode, Z_WAITOK | Z_ZERO | Z_NOFAIL);
+ 	(*fsnpp)->size = new_size;
+ 	(*fsnpp)->type = type;
+ 	(*fsnpp)->mnt = mp;
+@@ -154,7 +154,7 @@ mockfs_fsnode_destroy(mockfs_fsnode_t fsnp)
+ 		}
+ 	}
+ 
+-	kfree_type(mockfs_fsnode_t, fsnp);
++	kfree_type(struct mockfs_fsnode, fsnp);
+ done:
+ 	return rvalue;
+ }
+@@ -345,7 +345,8 @@ mockfs_fsnode_vnode(mockfs_fsnode_t fsnp, vnode_t * vpp)
+ 				panic("mockfs_fsvnode failed to get ubc_mem_object for a new vnode");
+ 			}
+ 
+-			rvalue = pager_map_to_phys_contiguous(ubc_mem_object, 0, (mockfs_mnt->mockfs_memdev_base << PAGE_SHIFT), fsnp->size);
++			/* memdev counts in 4K pages, independent of the kernel's PAGE_SHIFT. */
++			rvalue = pager_map_to_phys_contiguous(ubc_mem_object, 0, ((uint64_t)mockfs_mnt->mockfs_memdev_base << 12), fsnp->size);
+ 
+ 			if (rvalue) {
+ 				panic("mockfs_fsnode_vnode failed to create fictitious pages for a memory-backed device; rvalue = %d", rvalue);
+diff --git a/bsd/miscfs/mockfs/mockfs_vfsops.c b/bsd/miscfs/mockfs/mockfs_vfsops.c
+index 325bb06..42d06af 100644
+--- a/bsd/miscfs/mockfs/mockfs_vfsops.c
++++ b/bsd/miscfs/mockfs/mockfs_vfsops.c
+@@ -38,6 +38,9 @@
+ #include <sys/malloc.h>
+ #include <sys/mount_internal.h>
+ #include <sys/vnode_internal.h>
++#include <sys/buf.h>
++#include <mach-o/loader.h>
++#include <mach-o/fat.h>
+ 
+ static LCK_GRP_DECLARE(mockfs_mtx_grp, "mockfs-mutex");
+ 
+@@ -61,6 +64,43 @@ int mockfs_init(__unused struct vfsconf * vfsc);
+  *
+  * Returns 0 on success, or an error.
+  */
++/*
++ * mockfs_check_macho:
++ *   mockfs serves the whole root device as one executable, so it would claim
++ *   any device. Accept only a Mach-O (thin or fat) image, so that a device
++ *   holding a real filesystem is left to the next filesystem in mountroot.
++ */
++static int
++mockfs_check_macho(vnode_t rvp)
++{
++	buf_t bp = NULL;
++	uint32_t magic = 0;
++	int error;
++
++	error = (int)buf_meta_bread(rvp, 0, DEV_BSIZE, NOCRED, &bp);
++	if (!error) {
++		memcpy(&magic, (const void *)buf_dataptr(bp), sizeof(magic));
++		switch (magic) {
++		case MH_MAGIC:
++		case MH_CIGAM:
++		case MH_MAGIC_64:
++		case MH_CIGAM_64:
++		case FAT_MAGIC:
++		case FAT_CIGAM:
++			break;
++		default:
++			error = EINVAL;
++			break;
++		}
++	}
++	if (bp) {
++		/* Do not leave a DEV_BSIZE block cached for the next filesystem's reads. */
++		buf_markinvalid(bp);
++		buf_brelse(bp);
++	}
++	return error;
++}
++
+ int
+ mockfs_mountroot(mount_t mp, vnode_t rvp, __unused vfs_context_t ctx)
+ {
+@@ -72,9 +112,12 @@ mockfs_mountroot(mount_t mp, vnode_t rvp, __unused vfs_context_t ctx)
+ 	dk_memdev_info_t memdev_info;
+ 
+ 	/*
+-	 * TODO: Validate that the device at least LOOKS like a mach-o (has a sane header); this would prevent us
+-	 *   from causing EBADMACHO panics further along the boot path.
++	 * Validate that the device at least LOOKS like a mach-o (has a sane header); this prevents us from
++	 *   claiming devices that hold real filesystems, and from causing EBADMACHO panics further along the boot path.
+ 	 */
++	if ((rvalue = mockfs_check_macho(rvp))) {
++		return rvalue;
++	}
+ 
+ 	/*
+ 	 * There are no M_MOCKFS* definitions at the moment, just use M_TEMP.
+@@ -102,7 +145,12 @@ mockfs_mountroot(mount_t mp, vnode_t rvp, __unused vfs_context_t ctx)
+ 		 * For the moment, we won't try to optimize when mi_phys is true.
+ 		 */
+ 		if (!mockfs_mount_data->mockfs_physical_memory) {
+-			mockfs_mount_data->mockfs_memory_backed = memdev_info.mi_mdev;
++			/*
++			 * Only a physical memory device has an address the pager can map
++			 * directly; a virtual one (IOKit's RAMDisk) goes through normal
++			 * device I/O. mi_base is a physical page number only when mi_phys.
++			 */
++			mockfs_mount_data->mockfs_memory_backed = memdev_info.mi_mdev && memdev_info.mi_phys;
+ 			mockfs_mount_data->mockfs_physical_memory = memdev_info.mi_phys;
+ 			mockfs_mount_data->mockfs_memdev_base = memdev_info.mi_base;
+ 			mockfs_mount_data->mockfs_memdev_size = memdev_info.mi_size;
+diff --git a/bsd/net/rtsock.c b/bsd/net/rtsock.c
+index b2784ac..cc6acf0 100644
+--- a/bsd/net/rtsock.c
++++ b/bsd/net/rtsock.c
+@@ -571,6 +571,25 @@ route_output(struct mbuf *m, struct socket *so)
+ 		SIN6(info.rti_info[RTAX_DST])->sin6_addr.s6_addr16[1] = 0;
+ 	}
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/* SWEET: which process changes IPv4 routes (network bring-up). */
++	if ((RTM->rtm_type == RTM_ADD || RTM->rtm_type == RTM_DELETE || RTM->rtm_type == RTM_CHANGE) &&
++	    info.rti_info[RTAX_DST] != NULL && info.rti_info[RTAX_DST]->sa_family == AF_INET) {
++		static int sweet_rt_logged;
++		if (sweet_rt_logged++ < 200) {
++			const uint8_t *d = (const uint8_t *)&SIN(info.rti_info[RTAX_DST])->sin_addr;
++			const uint8_t *g = (info.rti_info[RTAX_GATEWAY] != NULL &&
++			    info.rti_info[RTAX_GATEWAY]->sa_family == AF_INET) ?
++			    (const uint8_t *)&SIN(info.rti_info[RTAX_GATEWAY])->sin_addr : NULL;
++			char pname[20];
++			proc_selfname(pname, sizeof(pname));
++			printf("SWEET NET: %s route %s %u.%u.%u.%u gw %u.%u.%u.%u ifindex %u flags 0x%x\n", pname,
++			    RTM->rtm_type == RTM_ADD ? "add" : RTM->rtm_type == RTM_DELETE ? "delete" : "change",
++			    d[0], d[1], d[2], d[3], g ? g[0] : 0, g ? g[1] : 0, g ? g[2] : 0, g ? g[3] : 0,
++			    RTM->rtm_index, RTM->rtm_flags);
++		}
++	}
++#endif
+ 	switch (RTM->rtm_type) {
+ 	case RTM_ADD:
+ 		if (info.rti_info[RTAX_GATEWAY] == NULL) {
+diff --git a/bsd/netinet/in.c b/bsd/netinet/in.c
+index 9e84d3e..1ad18b4 100644
+--- a/bsd/netinet/in.c
++++ b/bsd/netinet/in.c
+@@ -1136,6 +1136,20 @@ in_control(struct socket *so, u_long cmd, caddr_t __sized_by(IOCPARM_LEN(cmd)) d
+ 	/* In case it's NULL, make sure it came from the kernel */
+ 	VERIFY(so != NULL || p == kernproc);
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/* SWEET: which process sets IPv4 addresses on which interface. */
++	if ((cmd == SIOCAIFADDR || cmd == SIOCDIFADDR) && ifp != NULL) {
++		static int sweet_in_logged;
++		if (sweet_in_logged++ < 100) {
++			const uint8_t *a = (const uint8_t *)&((struct in_aliasreq *)(void *)data)->ifra_addr.sin_addr;
++			char pname[20];
++			proc_name(proc_pid(p), pname, sizeof(pname));
++			printf("SWEET NET: %s %s %s %u.%u.%u.%u\n", pname, if_name(ifp),
++			    cmd == SIOCAIFADDR ? "add address" : "delete address", a[0], a[1], a[2], a[3]);
++		}
++	}
++#endif
++
+ 	/*
+ 	 * ioctls which don't require ifp, but require socket.
+ 	 */
+diff --git a/bsd/sweet_hfs/core/hfs_catalog.c b/bsd/sweet_hfs/core/hfs_catalog.c
+index de38fbb..ea238d1 100644
+--- a/bsd/sweet_hfs/core/hfs_catalog.c
++++ b/bsd/sweet_hfs/core/hfs_catalog.c
+@@ -757,6 +757,22 @@ falsematch:
+ }
+ 
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET: hard links made by Linux tools lack kHFSHasLinkChainBit and every
++ * lookup of them repairs (in memory) and reports it again; the console
++ * output slows boot down. Report the first few only.
++ */
++static int
++sweet_hfs_link_note(void)
++{
++	static volatile SInt32 notes;
++	return OSIncrementAtomic(&notes) < 8;
++}
++#else
++#define sweet_hfs_link_note() 1
++#endif
++
+ /*
+  * cat_lookupbykey - lookup a catalog node using a cnode key
+  */
+@@ -882,7 +898,9 @@ cat_lookupbykey(struct hfsmount *hfsmp, CatalogKey *keyp, int flags, u_int32_t h
+ 		if (ilink) {
+ 			/* This is a hard link and the link count bit was not set */
+ 			if (!(attrp->ca_recflags & kHFSHasLinkChainMask)) {
+-				printf ("hfs: set hardlink bit on vol=%s cnid=%u inoid=%u\n", hfsmp->vcbVN, cnid, ilink);
++				if (sweet_hfs_link_note()) {
++					printf ("hfs: set hardlink bit on vol=%s cnid=%u inoid=%u\n", hfsmp->vcbVN, cnid, ilink);
++				}
+ 				attrp->ca_recflags |= kHFSHasLinkChainMask;
+ 			}
+ 		} else {
+@@ -894,12 +912,16 @@ cat_lookupbykey(struct hfsmount *hfsmp, CatalogKey *keyp, int flags, u_int32_t h
+ 				(parentid != hfsmp->hfs_private_desc[DIR_HARDLINKS].cd_cnid)) {
+ 				/* This is not a hard link or inode and the link count bit was set */
+ 				if (attrp->ca_recflags & kHFSHasLinkChainMask) {
+-					printf ("hfs: clear hardlink bit on vol=%s cnid=%u\n", hfsmp->vcbVN, cnid);
++					if (sweet_hfs_link_note()) {
++						printf ("hfs: clear hardlink bit on vol=%s cnid=%u\n", hfsmp->vcbVN, cnid);
++					}
+ 					attrp->ca_recflags &= ~kHFSHasLinkChainMask;
+ 				}
+ 				/* This is a regular file and the link count was more than 1 */
+ 				if (S_ISREG(attrp->ca_mode) && (attrp->ca_linkcount > 1)) {
+-					printf ("hfs: set linkcount=1 on vol=%s cnid=%u old=%u\n", hfsmp->vcbVN, cnid, attrp->ca_linkcount);
++					if (sweet_hfs_link_note()) {
++						printf ("hfs: set linkcount=1 on vol=%s cnid=%u old=%u\n", hfsmp->vcbVN, cnid, attrp->ca_linkcount);
++					}
+ 					attrp->ca_linkcount = 1;
+ 				}
+ 			}
+diff --git a/bsd/sweet_hfs/core/hfs_vfsutils.c b/bsd/sweet_hfs/core/hfs_vfsutils.c
+index bac1a80..03bfb27 100644
+--- a/bsd/sweet_hfs/core/hfs_vfsutils.c
++++ b/bsd/sweet_hfs/core/hfs_vfsutils.c
+@@ -202,10 +202,22 @@ OSErr hfs_MountHFSPlusVolume(struct hfsmount *hfsmp, HFSPlusVolumeHeader *vhp,
+ 	/* don't mount a writable volume if its dirty, it must be cleaned by fsck_hfs */
+ 	if ((hfsmp->hfs_flags & HFS_READ_ONLY) == 0 && hfsmp->jnl == NULL &&
+ 	    (SWAP_BE32(vhp->attributes) & kHFSVolumeUnmountedMask) == 0) {
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		/*
++		 * SWEET never unmounts its root (no clean shutdown yet), and
++		 * there is no fsck_hfs before the root mount: take it anyway.
++		 */
++		if (vfs_flags(hfsmp->hfs_mp) & MNT_ROOTFS) {
++			printf("hfs_mounthfsplus: SWEET: mounting dirty non-journaled root read-write\n");
++		} else {
++#endif
+ 		if (HFS_MOUNT_DEBUG) {
+ 			printf("hfs_mounthfsplus: cannot mount dirty non-journaled volumes\n");
+ 		}
+ 		return (EINVAL);
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		}
++#endif
+ 	}
+ 
+ 	/* Make sure we can live with the physical block size. */
+diff --git a/bsd/sys/pthread_internal.h b/bsd/sys/pthread_internal.h
+index 42e23d8..135405e 100644
+--- a/bsd/sys/pthread_internal.h
++++ b/bsd/sys/pthread_internal.h
+@@ -34,7 +34,12 @@
+ 
+ struct ksyn_waitq_element {
+ #if __LP64__
++	#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/* libpthread-514.100.2 includes the trailing kwe_uth pointer. */
++	char opaque[56];
++#else
+ 	char opaque[48];
++#endif
+ #else
+ 	char opaque[32];
+ #endif
+diff --git a/bsd/sys/uio_internal.h b/bsd/sys/uio_internal.h
+index 1a80355..61479d7 100644
+--- a/bsd/sys/uio_internal.h
++++ b/bsd/sys/uio_internal.h
+@@ -208,6 +208,14 @@ __END_DECLS
+ 	uint64_t name[P2ROUNDUP(UIO_SIZEOF(niov), sizeof(uint64_t)) \
+ 	    / sizeof(uint64_t)]
+ 
++/*
++ * UIO_STACKBUF - declare a correctly sized and aligned stack buffer for
++ *	uio_createwithbuffer(). Backported from later xnu: newer clang rejects
++ *	arrays of the over-aligned uio_stackbuf_t.
++ */
++#define UIO_STACKBUF(name, niov) \
++	uint64_t name[(UIO_SIZEOF(niov) + sizeof(uint64_t) - 1) / sizeof(uint64_t)]
++
+ #define UIO_IS_USER_SPACE32( a_uio_t )  \
+ 	( (1 << (a_uio_t)->uio_segflg) & (UIOF_USERSPACE32 | UIOF_PHYS_USERSPACE32 | UIOF_USERISPACE32))
+ #define UIO_IS_USER_SPACE64( a_uio_t )  \
+diff --git a/bsd/vfs/kpi_vfs.c b/bsd/vfs/kpi_vfs.c
+index b4a5832..2cb6abc 100644
+--- a/bsd/vfs/kpi_vfs.c
++++ b/bsd/vfs/kpi_vfs.c
+@@ -4660,6 +4660,20 @@ vn_rename(struct vnode *fdvp, struct vnode **fvpp, struct componentname *fcnp, s
+ 					_err = VNOP_RENAME(fdvp, *fvpp, fcnp, tdvp, *tvpp, tcnp, ctx);
+ 				}
+ 			}
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++			/*
++			 * SWEET: HFS has no RENAME_SWAP, which Foundation's atomic
++			 * writes use (usermanagerd: "Failed to atomically swap writing
++			 * file: Operation not supported"). Swapping two regular files
++			 * on one volume is what exchangedata does: each name ends up
++			 * with the other file's data and attributes.
++			 */
++			if (_err == ENOTSUP && flags == VFS_RENAME_SWAP && *tvpp != NULLVP &&
++			    vnode_isreg(*fvpp) && vnode_isreg(*tvpp) &&
++			    vnode_mount(*fvpp) == vnode_mount(*tvpp)) {
++				_err = VNOP_EXCHANGE(*fvpp, *tvpp, 0, ctx);
++			}
++#endif
+ 		} else {
+ 			_err = VNOP_RENAME(fdvp, *fvpp, fcnp, tdvp, *tvpp, tcnp, ctx);
+ 		}
+diff --git a/bsd/vfs/vfs_subr.c b/bsd/vfs/vfs_subr.c
+index 5b038ca..b1328f4 100644
+--- a/bsd/vfs/vfs_subr.c
++++ b/bsd/vfs/vfs_subr.c
+@@ -1250,6 +1250,18 @@ vfs_mountroot(void)
+ 
+ 		mp = vfs_rootmountalloc_internal(vfsp, "root_device");
+ 		mp->mnt_devvp = rootvp;
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		/*
++		 * SWEET has no data volume: /private/var lives on the root, so
++		 * boot-arg rootrw=1 mounts it read-write from the start.
++		 */
++		{
++			uint32_t rootrw = 0;
++			if (PE_parse_boot_argn("rootrw", &rootrw, sizeof(rootrw)) && rootrw) {
++				mp->mnt_flag &= ~MNT_RDONLY;
++			}
++		}
++#endif
+ 
+ 		if (vfsp->vfc_mountroot) {
+ 			error = (*vfsp->vfc_mountroot)(mp, rootvp, ctx);
+diff --git a/config/MASTER b/config/MASTER
+index 1b97480..f9288e9 100644
+--- a/config/MASTER
++++ b/config/MASTER
+@@ -112,6 +112,7 @@ options		CONFIG_WORKLOOP_DEBUG	# <config_workloop_debug>
+ #	4.4 filesystems
+ #
+ options		MOCKFS		# Boot from an executable	# <mockfs>
++options		SWEET_HFS	# Built-in Apple OSS HFS (SWEET)	# <sweet_hfs>
+ options		FIFO		# fifo support			# <fifo>
+ options		FDESC		# fdesc_fs support		# <fdesc>
+ options		DEVFS		# devfs support			# <devfs>
+diff --git a/config/Private.arm64.exports b/config/Private.arm64.exports
+index f767c86..597964a 100644
+--- a/config/Private.arm64.exports
++++ b/config/Private.arm64.exports
+@@ -90,82 +90,13 @@ _mach_bridge_recv_timestamps
+ _mach_bridge_init_timestamp
+ _mach_bridge_set_params
+ _vfs_resolver_result
+-_pmap_iommu_init
+-_pmap_iommu_iovmalloc
+-_pmap_iommu_map
+-_pmap_iommu_unmap
+-_pmap_iommu_iovmfree
+-_pmap_iommu_ioctl
+-_pmap_iommu_alloc_contiguous_pages
+-_pmap_acquire_iommu_scratch_area
+-_pmap_alloc_iommu_page
+-_pmap_free_iommu_page
+-_pmap_create_aligned_buffer
+-_pmap_destroy_aligned_buffer
+-_pmap_ref_iommu_table
+-_pmap_register_iommu_mapping
+-_pmap_release_iommu_scratch_area
+-_pmap_unregister_iommu_mapping
+-_pmap_cache_attributes
+-_nvme_ppl_get_desc
+-_sart_get_desc
+-_t8020dart_get_desc
+-_t8020dart_vo_tte
+-_t6000dart_get_desc
+-_t6000dart_vo_tte
+-_t8110dart_get_desc
+-_t8110dart_max_translation_levels
+-_t8110dart_vo_tte
+-_t8110dart_vo_tt_index
+-_sptm_gen3dart_init
+-_sptm_gen3dart_map_table
+-_sptm_gen3dart_unmap_table
+-_sptm_gen3dart_map
+-_sptm_gen3dart_unmap
+-_sptm_gen3dart_powerdown
+-_sptm_gen3dart_powerup
+-_sptm_gen3dart_disable_translation
+-_sptm_gen3dart_enable_translation
+-_sptm_gen3dart_clear_err
+-_sptm_gen3dart_clear_perf_interrupts
+-_sptm_gen3dart_clear_all_interrupts
+-_sptm_gen3dart_disable_all_interrupts
+-_sptm_gen3dart_clear_exception
+-_sptm_gen3dart_query_tlb
+-_sptm_gen3dart_set_smmu_window
+-_sptm_gen3dart_read_smmu_stt_index
+-_sptm_gen3dart_clamp_tlimits
+-_sptm_gen3dart_test_translation
+-_ml_amcc_error_inject_register
+-_ml_dcs_error_inject_register
+-_ml_mem_fault_report_enable_register
+ _ml_mcache_flush_callback_register
+-_uat_get_desc
+ _set_invalidate_hmac_function
+ _PE_panic_debugging_enabled
+ _register_additional_panic_data_buffer
+ _apply_func_phys
+ _Switch_context
+ _gT1Sz
+-__ZN26IOUnifiedAddressTranslator10gMetaClassE
+-__ZN26IOUnifiedAddressTranslator10superClassE
+-__ZN26IOUnifiedAddressTranslator17getPageTableEntryEy
+-__ZN26IOUnifiedAddressTranslator18setClientContextIDEjb
+-__ZN26IOUnifiedAddressTranslator21removeClientContextIDEv
+-__ZN26IOUnifiedAddressTranslator19isPageFaultExpectedEyj
+-__ZN26IOUnifiedAddressTranslator7getModeEv
+-__ZN26IOUnifiedAddressTranslator29getFirmwareAddressSpaceHandleEv
+-__ZN26IOUnifiedAddressTranslator22registerTaskForServiceEP4taskP9IOService
+-__ZN26IOUnifiedAddressTranslator23createMappingInApertureEjP18IOMemoryDescriptorjym
+-__ZN26IOUnifiedAddressTranslator23getTotalPageTableMemoryEv
+-__ZN26IOUnifiedAddressTranslator3mapEP11IOMemoryMapj
+-__ZN26IOUnifiedAddressTranslator5doMapEP18IOMemoryDescriptoryyj
+-__ZN26IOUnifiedAddressTranslator5unmapEP11IOMemoryMap
+-__ZN26IOUnifiedAddressTranslator7doUnmapEP18IOMemoryDescriptoryy
+-__ZN26IOUnifiedAddressTranslator8taskDiedEv
+-__ZN26IOUnifiedAddressTranslator12commitUnmapsEv
+-__ZN26IOUnifiedAddressTranslator14prepareFWUnmapEyy
+-__ZTV26IOUnifiedAddressTranslator
+ __ZN24IOBufferMemoryDescriptor18initWithGuardPagesEP4taskjy
+ __ZN24IOBufferMemoryDescriptor20inTaskWithGuardPagesEP4taskjy
+ __ZN27IOGuardPageMemoryDescriptor12initWithSizeEm
+diff --git a/config/Private.exports b/config/Private.exports
+index 9c32b79..8430d6d 100644
+--- a/config/Private.exports
++++ b/config/Private.exports
+@@ -915,11 +915,9 @@ _pmap_ce_free_acceleration_buffer
+ _pmap_claim_reserved_ppl_page
+ _pmap_free_reserved_ppl_page
+ _pmap_in_ppl
+-_pmap_has_iofilter_protected_write
+ _pmap_iofilter_protected_write
+ _pmap_lookup_in_static_trust_cache
+ _pmap_lookup_in_loaded_trust_caches
+-_pmap_cs_configuration
+ _port_name_to_task:_port_name_to_task_external
+ _port_name_to_thread
+ _post_sys_powersource
+diff --git a/iokit/Kernel/IOService.cpp b/iokit/Kernel/IOService.cpp
+index 6824ed8..452956f 100644
+--- a/iokit/Kernel/IOService.cpp
++++ b/iokit/Kernel/IOService.cpp
+@@ -1225,6 +1225,8 @@ IOService::startDeferredMatches(void)
+ #endif /* !NO_KEXTD */
+ }
+ 
++bool gIOServiceRootHeldForDaemon = true;     /* IOStartIOKit's busy count on the root, for the IOKit daemon */
++
+ void
+ IOService::iokitDaemonLaunched(void)
+ {
+@@ -1234,7 +1236,9 @@ IOService::iokitDaemonLaunched(void)
+ 	}
+ 	IOServiceTrace(IOSERVICE_KEXTD_READY, 0, 0, 0, 0);
+ 	startDeferredMatches();
+-	getServiceRoot()->adjustBusy(-1);
++	if (gIOServiceRootHeldForDaemon) {      /* (SWEET: IOStartIOKit may not have held it) */
++		getServiceRoot()->adjustBusy(-1);
++	}
+ 	IOService::publishUserResource(gIOResourceIOKitKey);
+ #endif /* !NO_KEXTD */
+ }
+@@ -5396,7 +5400,9 @@ IOService::publishHiddenMedia(IOService * parent)
+ 	bool                wasHiding;
+ 
+ 	iomediaClass = OSMetaClass::getMetaClassWithName(gIOMediaKey);
++#if !defined(ARM64_BOARD_CONFIG_SWEET)
+ 	assert(iomediaClass);
++#endif
+ 
+ 	LOCKWRITENOTIFY();
+ 	wasHiding = gIOServiceHideIOMedia;
+@@ -5405,6 +5411,13 @@ IOService::publishHiddenMedia(IOService * parent)
+ 	}
+ 	UNLOCKNOTIFY();
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/* SWEET has no IOStorageFamily: without the IOMedia class no media exists to unhide. */
++	if (!iomediaClass) {
++		wasHiding = false;
++	}
++#endif
++
+ 	FindRootMediaContext ctx = { .services = NULL, .parent = parent };
+ 
+ 	if (wasHiding) {
+@@ -5449,7 +5462,17 @@ IOService::setRootMedia(IOService * root)
+ 	bool unhide;
+ 
+ 	ioblockstoragedriverClass = OSMetaClass::getMetaClassWithName(gIOBlockStorageDriverKey);
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	/*
++	 * SWEET has no IOStorageFamily, so no service can be a block storage
++	 * driver: the root (e.g. a RAM disk) is not block media, as for image boot.
++	 */
++	if (!ioblockstoragedriverClass) {
++		root = NULL;
++	}
++#else
+ 	assert(ioblockstoragedriverClass);
++#endif
+ 
+ 	while (root) {
+ 		if (root->metaCast(ioblockstoragedriverClass)) {
+diff --git a/iokit/Kernel/IOStartIOKit.cpp b/iokit/Kernel/IOStartIOKit.cpp
+index 95553a0..6094334 100644
+--- a/iokit/Kernel/IOStartIOKit.cpp
++++ b/iokit/Kernel/IOStartIOKit.cpp
+@@ -46,6 +46,8 @@
+ #include <IOKit/IOKitKeysPrivate.h>
+ #include <IOKit/IOInterruptAccountingPrivate.h>
+ #include <IOKit/assert.h>
++
++extern bool gIOServiceRootHeldForDaemon;    /* IOService.cpp */
+ #include <sys/conf.h>
+ 
+ #include "IOKitKernelInternal.h"
+@@ -191,6 +193,16 @@ StartIOKitMatching(void)
+ 		 * messages the kernel after the in-kernel linker has been
+ 		 * removed and personalities have been sent.
+ 		 */
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		/* SWEET: driverkitd is killed at boot here (jetsam, its per-process memory limit) and never
++		 * checks in, so the root stayed busy for good: IOKitWaitQuiet never returned and every
++		 * SCNetworkInterface lookup (Settings > General > About, the Ethernet row) sat out its
++		 * timeout -- minutes for the About page. The root is not held unless boot-arg sweetiokitd=1. */
++		int hold = 0;
++		(void)PE_parse_boot_argn("sweetiokitd", &hold, sizeof(hold));
++		gIOServiceRootHeldForDaemon = hold != 0;
++		if (hold)
++#endif
+ 		IOService::getServiceRoot()->adjustBusy(1);
+ 	}
+ #endif
+diff --git a/iokit/Kernel/IOUserClient.cpp b/iokit/Kernel/IOUserClient.cpp
+index e3c0911..504a9df 100644
+--- a/iokit/Kernel/IOUserClient.cpp
++++ b/iokit/Kernel/IOUserClient.cpp
+@@ -2728,7 +2728,62 @@ is_io_service_match_property_table_bin(
+ 	return internal_io_service_match_property_table(service, matching, matchingCnt, matches);
+ }
+ 
+-static kern_return_t
++static 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET IOKit trace: registry and matching calls made by the processes
++ * named in boot-arg sweetiolog (comma separated, default "backboardd,SpringBoard";
++ * "-" turns it off) are printed as "IOK name: ...", at most 400 lines per
++ * boot, to find out what a daemon looks for before it gives up.
++ */
++static char sweet_iolog_names[128];
++static int sweet_iolog_parsed;
++static uint32_t sweet_iolog_lines;
++
++static bool
++sweet_iolog(char *name, size_t len)
++{
++	if (!sweet_iolog_parsed) {
++		if (!PE_parse_boot_argn("sweetiolog", sweet_iolog_names, sizeof(sweet_iolog_names))) {
++			strlcpy(sweet_iolog_names, "backboardd,SpringBoard", sizeof(sweet_iolog_names));
++		}
++		sweet_iolog_parsed = 1;
++	}
++	if (sweet_iolog_lines >= 400) {
++		return false;
++	}
++	proc_selfname(name, (int)len);
++	size_t n = strlen(name);
++	for (const char *t = sweet_iolog_names; *t;) {
++		const char *end = strchr(t, ',');
++		size_t tl = end ? (size_t)(end - t) : strlen(t);
++		if (tl == n && n > 0 && strncmp(t, name, n) == 0) {
++			sweet_iolog_lines++;
++			return true;
++		}
++		if (!end) {
++			break;
++		}
++		t = end + 1;
++	}
++	return false;
++}
++
++/* Compact XML of a matching dictionary, at most 240 characters. */
++static void
++sweet_iolog_dict(const char *name, const char *what, OSObject *dict, const char *result)
++{
++	OSSerialize *ser = OSSerialize::withCapacity(256);
++	const char *text = "?";
++	if (ser != NULL && dict != NULL && dict->serialize(ser)) {
++		text = ser->text();
++	}
++	IOLog("IOK %s: %s %.240s -> %s\n", name, what, text, result);
++	OSSafeReleaseNULL(ser);
++}
++#endif
++
++kern_return_t
+ internal_io_service_get_matching_services(
+ 	mach_port_t main_port,
+ 	const char * matching,
+@@ -2748,7 +2803,23 @@ internal_io_service_get_matching_services(
+ 
+ 	if ((dict = OSDynamicCast( OSDictionary, obj))) {
+ 		IOTaskRegistryCompatibilityMatching(current_task(), dict);
+-		*existing = IOUserIterator::withIterator(IOService::getMatchingServices( dict ));
++		OSIterator *found = IOService::getMatchingServices( dict );
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		char sname[32];
++		if (sweet_iolog(sname, sizeof(sname))) {
++			unsigned int count = 0;
++			if (found != NULL) {
++				while (found->getNextObject() != NULL) {
++					count++;
++				}
++				found->reset();
++			}
++			char res[16];
++			snprintf(res, sizeof(res), "%u found", count);
++			sweet_iolog_dict(sname, "matching", dict, res);
++		}
++#endif
++		*existing = IOUserIterator::withIterator(found);
+ 		kr = kIOReturnSuccess;
+ 	} else {
+ 		kr = kIOReturnBadArgument;
+@@ -2833,6 +2904,13 @@ internal_io_service_get_matching_service(
+ 		IOTaskRegistryCompatibilityMatching(current_task(), dict);
+ 		*service = IOService::copyMatchingService( dict );
+ 		kr = *service ? kIOReturnSuccess : kIOReturnNotFound;
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		char sname[32];
++		if (sweet_iolog(sname, sizeof(sname))) {
++			sweet_iolog_dict(sname, "matching1", dict,
++			    *service ? (*service)->getMetaClass()->getClassName() : "none");
++		}
++#endif
+ 	} else {
+ 		kr = kIOReturnBadArgument;
+ 	}
+@@ -2936,6 +3014,14 @@ internal_io_service_add_notification(
+ 			continue;
+ 		}
+ 		IOTaskRegistryCompatibilityMatching(current_task(), dict);
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		{
++			char sname[32];
++			if (sweet_iolog(sname, sizeof(sname))) {
++				sweet_iolog_dict(sname, notification_type, dict, "notify");
++			}
++		}
++#endif
+ 
+ 		if ((sym == gIOPublishNotification)
+ 		    || (sym == gIOFirstPublishNotification)) {
+@@ -3417,6 +3503,15 @@ is_io_registry_entry_from_path(
+ 	}
+ 
+ 	entry = IORegistryEntry::fromPath( path );
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	{
++		char sname[32];
++		if (sweet_iolog(sname, sizeof(sname))) {
++			IOLog("IOK %s: path %.200s -> %s\n", sname, path,
++			    entry ? entry->getMetaClass()->getClassName() : "none");
++		}
++	}
++#endif
+ 
+ 	if (!entry && IOTaskRegistryCompatibility(current_task())) {
+ 		OSDictionary * matching;
+@@ -4226,6 +4321,14 @@ is_io_registry_entry_get_child_iterator(
+ 
+ 	*iterator = IOUserIterator::withIterator(entry->getChildIterator(
+ 		    IORegistryEntry::getPlane( plane )));
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	{
++		char sname[32];
++		if (sweet_iolog(sname, sizeof(sname))) {
++			IOLog("IOK %s: children of %s in %.32s\n", sname, entry->getName(), plane);
++		}
++	}
++#endif
+ 
+ 	return kIOReturnSuccess;
+ }
+@@ -4441,6 +4544,15 @@ is_io_service_open_extended(
+ #endif
+ 		res = service->newUserClient( owningTask, (void *) owningTask,
+ 		    connect_type, propertiesDict, &client );
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		{
++			char sname[32];
++			if (sweet_iolog(sname, sizeof(sname))) {
++				IOLog("IOK %s: open %s type %u -> 0x%x\n", sname,
++				    service->getMetaClass()->getClassName(), connect_type, res);
++			}
++		}
++#endif
+ 
+ 		if (propertiesDict) {
+ 			propertiesDict->release();
+diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
+index 559a9db..40053c3 100644
+--- a/iokit/KernelConfigTables.cpp
++++ b/iokit/KernelConfigTables.cpp
+@@ -34,6 +34,60 @@
+ 
+ const char * gIOKernelConfigTables =
+     "("
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++    "   {"
++    "     'IOClass'         = SweetPlatformExpert;"
++    "     'IOProviderClass' = IOPlatformExpertDevice;"
++    "     'IONameMatch'     = 'xiaomi,sweet';"
++    "     'IOProbeScore'    = 10000:32;"
++    "   },"
++    "   {"
++    "     'IOClass'         = SweetCPU;"
++    "     'IOProviderClass' = IOPlatformDevice;"
++    "     'IONameMatch'     = 'qcom,kryo470';"
++    "     'IOProbeScore'    = 10000:32;"
++    "   },"
++    "   {"
++    "     'IOClass'         = AppleKeyStore;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = AppleKeyStore;"
++    "   },"
++    "   {"
++    "     'IOClass'         = IOWatchdog;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = IOWatchdog;"
++    "   },"
++    "   {"
++    "     'IOClass'         = IOCoreSurfaceRoot;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = IOCoreSurfaceRoot;"
++    "   },"
++    "   {"
++    "     'IOClass'         = AppleCLCD;"
++    "     'IOProviderClass' = IOPlatformDevice;"
++    "     'IONameMatch'     = 'sweet,display';"
++    "   },"
++    "   {"
++    "     'IOClass'         = SweetHIDButtons;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = SweetHIDButtons;"
++    "   },"
++    "   {"
++    "     'IOClass'         = SweetHIDTouch;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = SweetHIDTouch;"
++    "   },"
++    "   {"
++    "     'IOClass'         = SweetBattery;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = SweetBattery;"
++    "   },"
++    "   {"
++    "     'IOClass'         = AppleARMBacklight;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOMatchCategory' = SweetBacklight;"
++    "   },"
++#endif
+     "   {"
+     "     'IOClass'         = IOPanicPlatform;"
+     "     'IOProviderClass' = IOPlatformExpertDevice;"
+diff --git a/iokit/bsddev/IOKitBSDInit.cpp b/iokit/bsddev/IOKitBSDInit.cpp
+index 2bbd161..833d522 100644
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -795,6 +795,24 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
+ 		}
+ 	}
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++//
++//	SWEET: root on a GPT partition of the internal UFS (bsd/dev/sweet_ufs.c)
++//
++	if (strcmp(rdBootVar, "ufsroot0") == 0) {
++		extern int sweet_ufs_rootdev(dev_t *dev);
++		OSSafeReleaseNULL(matching);
++		int ufs_error = sweet_ufs_rootdev(root);
++		if (ufs_error) {
++			panic("IOFindBSDRoot: SWEET UFS root %s unavailable: %d", rdBootVar, ufs_error);
++		}
++		strlcpy(rootName, rdBootVar, rootNameSize);
++		IOLog("BSD root: %s, major %d, minor %d\n", rootName, major(*root), minor(*root));
++		*oflags = 0;
++		goto iofrootx;
++	}
++#endif
++
+ //
+ //	Now check if we are trying to root on a memory device
+ //
+diff --git a/iokit/conf/files b/iokit/conf/files
+index c72c690..472cf0a 100644
+--- a/iokit/conf/files
++++ b/iokit/conf/files
+@@ -159,3 +159,4 @@ iokit/bsddev/skywalk/IOSkywalkSupport.cpp		optional iokitcpp skywalk
+ 
+ # Exclaves
+ iokit/Exclaves/Exclaves.cpp			optional iokitcpp
++iokit/Kernel/hakios.wlan.cpp			optional iokitcpp
+diff --git a/iokit/conf/files.arm64 b/iokit/conf/files.arm64
+index f2aa835..018be4a 100644
+--- a/iokit/conf/files.arm64
++++ b/iokit/conf/files.arm64
+@@ -6,3 +6,19 @@ iokit/Kernel/IOPMrootDomain.cpp    					optional iokitcpp
+ # SMP
+ iokit/Kernel/arm/AppleARMSMP.cpp    					optional iokitcpp
+ 
++
++# SWEET device-tree platform (empty translation unit on other boards)
++iokit/Kernel/arm/SweetPlatformExpert.cpp                         optional iokitcpp
++
++iokit/Kernel/arm/SweetCPU.cpp                                    optional iokitcpp
++iokit/Kernel/arm/SweetEntitlements.cpp                           optional iokitcpp
++iokit/Kernel/arm/SweetKeyStore.cpp                               optional iokitcpp
++iokit/Kernel/arm/SweetWatchdog.cpp                               optional iokitcpp
++iokit/Kernel/arm/SweetSurface.cpp                                optional iokitcpp
++iokit/Kernel/arm/SweetFramebuffer.cpp                            optional iokitcpp
++iokit/Kernel/arm/SweetBattery.cpp                                optional iokitcpp
++iokit/Kernel/arm/SweetBacklight.cpp                              optional iokitcpp
++iokit/Kernel/arm/hid/SweetHID.cpp                                optional iokitcpp
++iokit/Kernel/arm/hid/IOHIDEvent.cpp                              optional iokitcpp
++iokit/Kernel/arm/hid/IOHIDEventServiceQueue.cpp                  optional iokitcpp
++iokit/Kernel/arm/hid/IOHIDEventServiceUserClient.cpp             optional iokitcpp
+diff --git a/libkern/conf/Makefile.template b/libkern/conf/Makefile.template
+index 6ef0911..a3ae458 100644
+--- a/libkern/conf/Makefile.template
++++ b/libkern/conf/Makefile.template
+@@ -19,6 +19,51 @@ include $(MakeInc_def)
+ CFLAGS+= -include meta_features.h -DLIBKERN_KERNEL_PRIVATE -DOSALLOCDEBUG=1
+ SFLAGS+= -include meta_features.h
+ 
++ifeq ($(CURRENT_MACHINE_CONFIG),SWEET)
++SWEET_AES_ROOT = $(SRCROOT)/libkern/crypto/sweet_bearssl
++SWEET_AES_INC = -I$(SWEET_AES_ROOT)/inc -I$(SWEET_AES_ROOT)/src
++sweet_aes.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes_ct.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes_ct_enc.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes_ct_dec.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes_ct_cbcenc.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes_ct_cbcdec.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_aes.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_aes_ct.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_aes_ct_enc.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_aes_ct_dec.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_aes_ct_cbcenc.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_aes_ct_cbcdec.o_CFLAGS_ADD += -mgeneral-regs-only
++corecrypto_aes.o_CFLAGS_ADD += -mgeneral-regs-only
++# BearSSL MD5 behind the legacy MD5Init/Update/Final API (corecrypto_md5.c).
++sweet_md5.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_dec32le.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_enc32le.o_INCFLAGS = $(SWEET_AES_INC)
++corecrypto_md5.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_md5.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_dec32le.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_enc32le.o_CFLAGS_ADD += -mgeneral-regs-only
++corecrypto_md5.o_CFLAGS_ADD += -mgeneral-regs-only
++# BearSSL SHA-1 behind the legacy SHA1Init/Update/Final API (corecrypto_sha1.c).
++sweet_sha1.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_dec32be.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_enc32be.o_INCFLAGS = $(SWEET_AES_INC)
++corecrypto_sha1.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_sha1.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_dec32be.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_enc32be.o_CFLAGS_ADD += -mgeneral-regs-only
++corecrypto_sha1.o_CFLAGS_ADD += -mgeneral-regs-only
++# BearSSL SHA-384/512 for SHA384_*/SHA512_* (corecrypto_sha2.c).
++sweet_sha2big.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_dec64be.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_enc64be.o_INCFLAGS = $(SWEET_AES_INC)
++corecrypto_sha2.o_INCFLAGS = $(SWEET_AES_INC)
++sweet_sha2big.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_dec64be.o_CFLAGS_ADD += -mgeneral-regs-only
++sweet_enc64be.o_CFLAGS_ADD += -mgeneral-regs-only
++corecrypto_sha2.o_CFLAGS_ADD += -mgeneral-regs-only
++endif
++
+ # Runtime support functions don't interact well with LTO (9294679)
+ stack_protector.o_CFLAGS_ADD += $(CFLAGS_NOLTO_FLAG)
+ 
+diff --git a/libkern/conf/files b/libkern/conf/files
+index c4684c2..848ca35 100644
+--- a/libkern/conf/files
++++ b/libkern/conf/files
+@@ -97,6 +97,21 @@ libkern/crypto/corecrypto_sha1.c		optional crypto
+ libkern/crypto/corecrypto_md5.c			optional crypto
+ libkern/crypto/corecrypto_des.c			optional crypto
+ libkern/crypto/corecrypto_aes.c			optional crypto
++libkern/crypto/sweet_aes.c	optional crypto
++libkern/crypto/sweet_aes_ct.c	optional crypto
++libkern/crypto/sweet_aes_ct_enc.c	optional crypto
++libkern/crypto/sweet_aes_ct_dec.c	optional crypto
++libkern/crypto/sweet_aes_ct_cbcenc.c	optional crypto
++libkern/crypto/sweet_aes_ct_cbcdec.c	optional crypto
++libkern/crypto/sweet_md5.c	optional crypto
++libkern/crypto/sweet_dec32le.c	optional crypto
++libkern/crypto/sweet_enc32le.c	optional crypto
++libkern/crypto/sweet_sha1.c	optional crypto
++libkern/crypto/sweet_dec32be.c	optional crypto
++libkern/crypto/sweet_enc32be.c	optional crypto
++libkern/crypto/sweet_sha2big.c	optional crypto
++libkern/crypto/sweet_dec64be.c	optional crypto
++libkern/crypto/sweet_enc64be.c	optional crypto
+ libkern/crypto/corecrypto_aesxts.c		optional crypto
+ libkern/crypto/corecrypto_rand.c		optional crypto
+ libkern/crypto/corecrypto_rsa.c		    optional crypto
+diff --git a/libkern/crypto/corecrypto_aes.c b/libkern/crypto/corecrypto_aes.c
+index 20ff4f1..384abb6 100644
+--- a/libkern/crypto/corecrypto_aes.c
++++ b/libkern/crypto/corecrypto_aes.c
+@@ -32,10 +32,21 @@
+ #include <corecrypto/ccaes.h>
+ #include <kern/debug.h>
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/* SWEET has a built-in portable AES provider for the legacy CBC/ECB API. */
++extern const struct ccmode_cbc sweet_aes_cbc_encrypt;
++extern const struct ccmode_cbc sweet_aes_cbc_decrypt;
++#define AES_CBC_ENCRYPT_MODE (&sweet_aes_cbc_encrypt)
++#define AES_CBC_DECRYPT_MODE (&sweet_aes_cbc_decrypt)
++#else
++#define AES_CBC_ENCRYPT_MODE (g_crypto_funcs->ccaes_cbc_encrypt)
++#define AES_CBC_DECRYPT_MODE (g_crypto_funcs->ccaes_cbc_decrypt)
++#endif
++
+ aes_rval
+ aes_encrypt_key(const unsigned char *key, int key_len, aes_encrypt_ctx cx[1])
+ {
+-	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_encrypt;
++	const struct ccmode_cbc *cbc = AES_CBC_ENCRYPT_MODE;
+ 
+ 	/* Make sure the context size for the mode fits in the one we have */
+ 	if (cbc->size > sizeof(aes_encrypt_ctx)) {
+@@ -49,7 +60,7 @@ aes_rval
+ aes_encrypt_cbc(const unsigned char *in_blk, const unsigned char *in_iv, unsigned int num_blk,
+     unsigned char *out_blk, aes_encrypt_ctx cx[1])
+ {
+-	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_encrypt;
++	const struct ccmode_cbc *cbc = AES_CBC_ENCRYPT_MODE;
+ 	cccbc_iv_decl(cbc->block_size, ctx_iv);
+ 
+ 	int rc = cccbc_set_iv(cbc, ctx_iv, in_iv);
+@@ -72,7 +83,7 @@ aes_encrypt(const unsigned char *in_blk, unsigned char *out_blk, aes_encrypt_ctx
+ aes_rval
+ aes_decrypt_key(const unsigned char *key, int key_len, aes_decrypt_ctx cx[1])
+ {
+-	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_decrypt;
++	const struct ccmode_cbc *cbc = AES_CBC_DECRYPT_MODE;
+ 
+ 	/* Make sure the context size for the mode fits in the one we have */
+ 	if (cbc->size > sizeof(aes_decrypt_ctx)) {
+@@ -86,7 +97,7 @@ aes_rval
+ aes_decrypt_cbc(const unsigned char *in_blk, const unsigned char *in_iv, unsigned int num_blk,
+     unsigned char *out_blk, aes_decrypt_ctx cx[1])
+ {
+-	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_decrypt;
++	const struct ccmode_cbc *cbc = AES_CBC_DECRYPT_MODE;
+ 	cccbc_iv_decl(cbc->block_size, ctx_iv);
+ 
+ 	int rc = cccbc_set_iv(cbc, ctx_iv, in_iv);
+diff --git a/libkern/crypto/corecrypto_md5.c b/libkern/crypto/corecrypto_md5.c
+index 242dcdb..e9bbc42 100644
+--- a/libkern/crypto/corecrypto_md5.c
++++ b/libkern/crypto/corecrypto_md5.c
+@@ -17,6 +17,62 @@ setCount(MD5_CTX *ctx, uint64_t count)
+ }
+ 
+ /* Copy a ccdigest ctx into a legacy MD5 context */
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET has no corecrypto kext (g_crypto_funcs stays NULL). MD5 uses
++ * BearSSL's portable implementation (libkern/crypto/sweet_md5.c), with
++ * MD5_CTX carrying exactly its state: chaining value, byte count and the
++ * partial block, converted around each call like the corecrypto path does.
++ */
++#include "sweet_bearssl/inc/bearssl_hash.h"
++
++static void
++MD5ToBr(MD5_CTX *md5_ctx, br_md5_context *br_ctx)
++{
++	br_md5_init(br_ctx);
++	memcpy(br_ctx->val, md5_ctx->state, sizeof(br_ctx->val));
++	br_ctx->count = getCount(md5_ctx);
++	memcpy(br_ctx->buf, md5_ctx->buffer, sizeof(br_ctx->buf));
++}
++
++static void
++BrToMD5(const br_md5_context *br_ctx, MD5_CTX *md5_ctx)
++{
++	memcpy(md5_ctx->state, br_ctx->val, sizeof(md5_ctx->state));
++	setCount(md5_ctx, br_ctx->count);
++	memcpy(md5_ctx->buffer, br_ctx->buf, sizeof(md5_ctx->buffer));
++}
++
++void
++MD5Init(MD5_CTX *ctx)
++{
++	br_md5_context br_ctx;
++
++	br_md5_init(&br_ctx);
++	BrToMD5(&br_ctx, ctx);
++}
++
++void
++MD5Update(MD5_CTX *ctx, const void *data, unsigned int len)
++{
++	br_md5_context br_ctx;
++
++	MD5ToBr(ctx, &br_ctx);
++	br_md5_update(&br_ctx, data, len);
++	BrToMD5(&br_ctx, ctx);
++}
++
++void
++MD5Final(unsigned char digest[MD5_DIGEST_LENGTH], MD5_CTX *ctx)
++{
++	br_md5_context br_ctx;
++
++	MD5ToBr(ctx, &br_ctx);
++	br_md5_out(&br_ctx, digest);
++}
++
++#else /* !ARM64_BOARD_CONFIG_SWEET */
++
+ static void
+ DiToMD5(const struct ccdigest_info *di, struct ccdigest_ctx *di_ctx, MD5_CTX *md5_ctx)
+ {
+@@ -68,3 +124,5 @@ MD5Final(unsigned char digest[MD5_DIGEST_LENGTH], MD5_CTX *ctx)
+ 	MD5ToDi(di, ctx, di_ctx);
+ 	ccdigest_final(di, di_ctx, digest);
+ }
++
++#endif /* !ARM64_BOARD_CONFIG_SWEET */
+diff --git a/libkern/crypto/corecrypto_sha1.c b/libkern/crypto/corecrypto_sha1.c
+index 5fd982b..409533d 100644
+--- a/libkern/crypto/corecrypto_sha1.c
++++ b/libkern/crypto/corecrypto_sha1.c
+@@ -16,6 +16,62 @@ setCount(SHA1_CTX *ctx, uint64_t count)
+ 	ctx->c.b64[0] = count;
+ }
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET has no corecrypto kext (g_crypto_funcs stays NULL). SHA-1 uses
++ * BearSSL's portable implementation (libkern/crypto/sweet_sha1.c), with
++ * SHA1_CTX carrying exactly its state: chaining value, byte count and the
++ * partial block, converted around each call like the corecrypto path does.
++ */
++#include "sweet_bearssl/inc/bearssl_hash.h"
++
++static void
++SHA1ToBr(SHA1_CTX *sha1_ctx, br_sha1_context *br_ctx)
++{
++	br_sha1_init(br_ctx);
++	memcpy(br_ctx->val, sha1_ctx->h.b32, sizeof(br_ctx->val));
++	br_ctx->count = getCount(sha1_ctx);
++	memcpy(br_ctx->buf, sha1_ctx->m.b8, sizeof(br_ctx->buf));
++}
++
++static void
++BrToSHA1(const br_sha1_context *br_ctx, SHA1_CTX *sha1_ctx)
++{
++	memcpy(sha1_ctx->h.b32, br_ctx->val, sizeof(sha1_ctx->h.b32));
++	setCount(sha1_ctx, br_ctx->count);
++	memcpy(sha1_ctx->m.b8, br_ctx->buf, sizeof(sha1_ctx->m.b8));
++}
++
++void
++SHA1Init(SHA1_CTX *ctx)
++{
++	br_sha1_context br_ctx;
++
++	br_sha1_init(&br_ctx);
++	BrToSHA1(&br_ctx, ctx);
++}
++
++void
++SHA1Update(SHA1_CTX *ctx, const void *data, size_t len)
++{
++	br_sha1_context br_ctx;
++
++	SHA1ToBr(ctx, &br_ctx);
++	br_sha1_update(&br_ctx, data, len);
++	BrToSHA1(&br_ctx, ctx);
++}
++
++void
++SHA1Final(void *digest, SHA1_CTX *ctx)
++{
++	br_sha1_context br_ctx;
++
++	SHA1ToBr(ctx, &br_ctx);
++	br_sha1_out(&br_ctx, digest);
++}
++
++#else /* !ARM64_BOARD_CONFIG_SWEET */
++
+ /* Copy a ccdigest ctx into a legacy SHA1 context */
+ static void
+ DiToSHA1(const struct ccdigest_info *di, struct ccdigest_ctx *di_ctx, SHA1_CTX *sha1_ctx)
+@@ -69,6 +125,8 @@ SHA1Final(void *digest, SHA1_CTX *ctx)
+ 	ccdigest_final(di, di_ctx, digest);
+ }
+ 
++#endif /* !ARM64_BOARD_CONFIG_SWEET */
++
+ /* This is not publicised in header, but exported in libkern.exports */
+ void SHA1Final_r(SHA1_CTX *context, void *digest);
+ void
+diff --git a/libkern/crypto/corecrypto_sha2.c b/libkern/crypto/corecrypto_sha2.c
+index 7392f0c..c954dd2 100644
+--- a/libkern/crypto/corecrypto_sha2.c
++++ b/libkern/crypto/corecrypto_sha2.c
+@@ -34,38 +34,101 @@
+ 
+ #if defined(CRYPTO_SHA2)
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET has no corecrypto kext, so g_crypto_funcs stays NULL. SHA-256 uses
++ * XNU's built-in implementation directly, as the SWEET PRNG does; this also
++ * serves code-signing page hashes. SHA-384/512 use BearSSL's portable
++ * implementation (libkern/crypto/sweet_sha2big.c), its context stored in
++ * the caller's SHA384_CTX/SHA512_CTX.
++ */
++#include <corecrypto/ccsha2.h>
++#define SHA256_DI()                     (&ccsha256_ltc_di)
++#define SHA256_INIT(di, ctx)            ccdigest_init(di, ctx)
++#define SHA256_UPDATE(di, ctx, len, d)  ccdigest_update(di, ctx, len, d)
++#else
++#define SHA256_DI()                     (g_crypto_funcs->ccsha256_di)
++#define SHA256_INIT(di, ctx)            g_crypto_funcs->ccdigest_init_fn(di, ctx)
++#define SHA256_UPDATE(di, ctx, len, d)  g_crypto_funcs->ccdigest_update_fn(di, ctx, len, d)
++#endif
++
+ void
+ SHA256_Init(SHA256_CTX *ctx)
+ {
+ 	const struct ccdigest_info *di;
+-	di = g_crypto_funcs->ccsha256_di;
++	di = SHA256_DI();
+ 
+ 	/* Make sure the context size for the digest info fits in the one we have */
+ 	if (ccdigest_di_size(di) > sizeof(SHA256_CTX)) {
+ 		panic("%s: inconsistent size for SHA256 context", __FUNCTION__);
+ 	}
+ 
+-	g_crypto_funcs->ccdigest_init_fn(di, ctx->ctx);
++	SHA256_INIT(di, ctx->ctx);
+ }
+ 
+ void
+ SHA256_Update(SHA256_CTX *ctx, const void *data, size_t len)
+ {
+ 	const struct ccdigest_info *di;
+-	di = g_crypto_funcs->ccsha256_di;
++	di = SHA256_DI();
+ 
+-	g_crypto_funcs->ccdigest_update_fn(di, ctx->ctx, len, data);
++	SHA256_UPDATE(di, ctx->ctx, len, data);
+ }
+ 
+ void
+ SHA256_Final(void *digest, SHA256_CTX *ctx)
+ {
+ 	const struct ccdigest_info *di;
+-	di = g_crypto_funcs->ccsha256_di;
++	di = SHA256_DI();
+ 
+ 	ccdigest_final(di, ctx->ctx, digest);
+ }
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++#include "sweet_bearssl/inc/bearssl_hash.h"
++
++_Static_assert(sizeof(br_sha384_context) <= sizeof(SHA512_CTX),
++    "BearSSL SHA-384/512 context must fit in SHA512_CTX");
++#define BR_CTX(ctx) ((br_sha384_context *)(void *)(ctx))
++
++void
++SHA384_Init(SHA384_CTX *ctx)
++{
++	br_sha384_init(BR_CTX(ctx));
++}
++
++void
++SHA384_Update(SHA384_CTX *ctx, const void *data, size_t len)
++{
++	br_sha384_update(BR_CTX(ctx), data, len);
++}
++
++void
++SHA384_Final(void *digest, SHA384_CTX *ctx)
++{
++	br_sha384_out(BR_CTX(ctx), digest);
++}
++
++void
++SHA512_Init(SHA512_CTX *ctx)
++{
++	br_sha512_init(BR_CTX(ctx));
++}
++
++void
++SHA512_Update(SHA512_CTX *ctx, const void *data, size_t len)
++{
++	br_sha512_update(BR_CTX(ctx), data, len);
++}
++
++void
++SHA512_Final(void *digest, SHA512_CTX *ctx)
++{
++	br_sha512_out(BR_CTX(ctx), digest);
++}
++
++#else /* !ARM64_BOARD_CONFIG_SWEET */
++
+ void
+ SHA384_Init(SHA384_CTX *ctx)
+ {
+@@ -131,6 +194,8 @@ SHA512_Final(void *digest, SHA512_CTX *ctx)
+ 	ccdigest_final(di, ctx->ctx, digest);
+ }
+ 
++#endif /* !ARM64_BOARD_CONFIG_SWEET */
++
+ #else
+ 
+ /* As these are part of the KPI, we need to stub them out for any kernel configuration that does not support SHA2. */
+diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
+index e37762b..57418fb 100644
+--- a/makedefs/MakeInc.def
++++ b/makedefs/MakeInc.def
+@@ -29,12 +29,11 @@ SUPPORTED_ARM64_MACHINE_CONFIGS = NONE
+ else ifneq ($(findstring _host,$(RC_ProjectName)),)
+ SUPPORTED_ARM64_MACHINE_CONFIGS = NONE
+ else
+-SUPPORTED_ARM64_MACHINE_CONFIGS = T6000 T6020 T6030 T6031 T6041 T6050 T8101 T8103 T8112 T8122 T8132 T8142 VMAPPLE
++SUPPORTED_ARM64_MACHINE_CONFIGS = T6000 T6020 T6030 T6031 T6041 T6050 T8101 T8103 T8112 T8122 T8132 T8142 VMAPPLE SWEET
+ 
+ SPTM_ENABLED_SOCS_MacOSX = t6000 t8112 t6020 t8122 t6030 t6031 t6041 t6050 t8132 t8142
+ EXCLAVES_ENABLED_SOCS_MacOSX = t8142 t6050
+ 
+-
+ endif
+ 
+ #
+@@ -93,6 +92,7 @@ MACHINE_FLAGS_ARM64_T8132 = -DARM64_BOARD_CONFIG_T8132			-mcpu=apple-m4
+ MACHINE_FLAGS_ARM64_T8142 = -DARM64_BOARD_CONFIG_T8142 			-mcpu=apple-m4+memtag+predres2
+ 
+ MACHINE_FLAGS_ARM64_VMAPPLE = -DARM64_BOARD_CONFIG_VMAPPLE              -march=armv8.5a+sme2
++MACHINE_FLAGS_ARM64_SWEET = -DARM64_BOARD_CONFIG_SWEET                -march=armv8.2-a+crypto
+ 
+ 
+ #
+@@ -370,8 +370,11 @@ ifeq ($(ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG),)
+ # Without embdedded device map, use a default arch string
+ export ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG := $(shell echo $(CURRENT_ARCH_CONFIG) | tr A-Z a-z)
+ ifneq ($(filter arm64,$(ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG)),)
++# sweet's Cortex-A76/A55 have no pointer authentication: stay plain arm64
++ifneq ($(CURRENT_MACHINE_CONFIG),SWEET)
+ export ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG := arm64e
+ endif
++endif
+ 
+ endif
+ 
+@@ -1147,7 +1150,7 @@ LDFILES_KERNEL_ONLY = $(TARGET)/all-kpi.exp $(TARGET)/all-alias.exp $(TARGET)/sy
+ #
+ # Default runtime libraries to be linked with the kernel
+ #
+-LD_KERNEL_LIBS	   = -lcc_kext
++LD_KERNEL_LIBS	   = -lcc_kext $(WIFI_ATH10K_OBJ)
+ LD_KERNEL_ARCHIVES = $(LDFLAGS_KERNEL_SDK) -lfirehose_kernel
+ 
+ # Link binary support library
+diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
+index 6690846..858c152 100644
+--- a/osfmk/arm/arm_init.c
++++ b/osfmk/arm/arm_init.c
+@@ -58,6 +58,7 @@
+ #include <pexpert/arm/consistent_debug.h>
+ #include <pexpert/device_tree.h>
+ #include <arm64/proc_reg.h>
++#include <arm64/sweet_early.h>
+ #include <arm/pmap.h>
+ #include <arm/caches_internal.h>
+ #include <arm/cpu_internal.h>
+@@ -356,6 +357,8 @@ arm_init(
+ 	DTEntry chosen = NULL;
+ 	unsigned int dt_entry_size = 0;
+ 
++	sweet_early_mark(1, "arm_init entered (MMU on)");
++
+ 	arm_slide_rebase_and_sign_image();
+ 
+ 	arm_static_if_init(args);
+@@ -376,6 +379,7 @@ arm_init(
+ #endif /* defined(HAS_APPLE_PAC) */
+ 
+ 	PE_init_platform(FALSE, args); /* Get platform expert set up */
++	sweet_early_mark(2, "PE_init_platform done");
+ 
+ #if __arm64__
+ 	configure_timer_apple_regs();
+@@ -459,6 +463,7 @@ arm_init(
+ #endif
+ 
+ 	ml_parse_cpu_topology();
++	sweet_early_mark(3, "ml_parse_cpu_topology done");
+ 
+ 
+ 	boot_cpu_id = ml_get_boot_cpu_number();
+@@ -490,11 +495,13 @@ arm_init(
+ 	 */
+ 	thread->machine.preemption_count = 0;
+ 	cpu_bootstrap();
++	sweet_early_mark(4, "cpu_bootstrap done");
+ 
+ 	rtclock_early_init();
+ 
+ 	kernel_debug_string_early("kernel_startup_bootstrap");
+ 	kernel_startup_bootstrap();
++	sweet_early_mark(5, "kernel_startup_bootstrap done");
+ 
+ 	/*
+ 	 * Initialize the timer callout world
+@@ -503,6 +510,7 @@ arm_init(
+ 
+ 	cpu_init();
+ 
++	sweet_early_mark(6, "cpu_init done");
+ 	processor_bootstrap();
+ 
+ 	if (PE_parse_boot_argn("maxmem", &maxmem, sizeof(maxmem))) {
+@@ -569,7 +577,9 @@ arm_init(
+ 	gDramSize = *dram_size;
+ 	pmap_first_pnum = (ppnum_t)atop(gDramBase);
+ 
++	sweet_early_mark(7, "entering arm_vm_init");
+ 	arm_vm_init(xmaxmem, args);
++	sweet_early_mark(15, "arm_vm_init returned");
+ 
+ 	if (debug_boot_arg) {
+ 		patch_low_glo();
+@@ -582,9 +592,15 @@ arm_init(
+ 	PE_consistent_debug_inherit();
+ 
+ 	/* Setup debugging output. */
++	sweet_early_mark(16, "calling serial_init");
+ 	const unsigned int serial_exists = serial_init();
++	sweet_early_mark(19, "serial_init returned");
+ 	kernel_startup_initialize_upto(STARTUP_SUB_KPRINTF);
+ 	kprintf("kprintf initialized\n");
++	sweet_early_mark(20, "kprintf startup complete");
++	if (serial_exists) {
++		sweet_early_disable();
++	}
+ 
+ 	serialmode = 0;
+ 	if (PE_parse_boot_argn("serial", &serialmode, sizeof(serialmode))) {
+diff --git a/osfmk/arm/pmap/pmap.c b/osfmk/arm/pmap/pmap.c
+index 19e7e67..4496861 100644
+--- a/osfmk/arm/pmap/pmap.c
++++ b/osfmk/arm/pmap/pmap.c
+@@ -4952,8 +4952,9 @@ pmap_page_protect_options_with_flush_range(
+ 			}
+ #endif
+ 			if (remove && (options & PMAP_OPTIONS_COMPRESSOR)) {
+-				panic("pmap_page_protect: attempt to compress ppnum 0x%x owned by iommu %p, pve_p=%p",
+-				    ppnum, ptep_get_iommu(pte_p), pve_p);
++				/* ptep_get_iommu() only exists in Apple's PPL builds: report the raw PV entry */
++				panic("pmap_page_protect: attempt to compress ppnum 0x%x owned by iommu pte %p, pve_p=%p",
++				    ppnum, pte_p, pve_p);
+ 			}
+ 			goto protect_skip_pve_pass1;
+ 		}
+@@ -6180,6 +6181,9 @@ pmap_construct_pte(
+ 	return pte;
+ }
+ 
++/* defined further down; used by pmap_enter_options_internal() */
++MARK_AS_PMAP_TEXT static void pmap_phys_write_disable(vm_address_t va);
++
+ MARK_AS_PMAP_TEXT kern_return_t
+ pmap_enter_options_internal(
+ 	pmap_t pmap,
+@@ -7235,7 +7239,7 @@ void
+ pmap_sync_page_attributes_phys(
+ 	ppnum_t pp)
+ {
+-	flush_dcache((vm_offset_t) (pp << PAGE_SHIFT), PAGE_SIZE, TRUE);
++	flush_dcache((vm_offset_t) pp << PAGE_SHIFT, PAGE_SIZE, TRUE);     /* (pp << PAGE_SHIFT) lost bit 32 of PAs above 4 GB */
+ }
+ 
+ #if CONFIG_COREDUMP
+@@ -12243,7 +12247,8 @@ pmap_cs_lockdown_pages(vm_address_t kva, vm_size_t size, bool ppl_writable)
+ #if XNU_MONITOR
+ 	pmap_ppl_lockdown_pages(kva, size, PVH_FLAG_LOCKDOWN_CS, ppl_writable);
+ #else
+-	pmap_ppl_lockdown_pages(kva, size, 0, ppl_writable);
++	/* No PPL: nothing can lock pages down (pmap_ppl_lockdown_pages is PPL-only) */
++#pragma unused(kva, size, ppl_writable)
+ #endif
+ }
+ 
+@@ -12253,7 +12258,7 @@ pmap_cs_unlockdown_pages(vm_address_t kva, vm_size_t size, bool ppl_writable)
+ #if XNU_MONITOR
+ 	pmap_ppl_unlockdown_pages(kva, size, PVH_FLAG_LOCKDOWN_CS, ppl_writable);
+ #else
+-	pmap_ppl_unlockdown_pages(kva, size, 0, ppl_writable);
++#pragma unused(kva, size, ppl_writable)
+ #endif
+ }
+ 
+diff --git a/osfmk/arm/pmap/pmap_misc.c b/osfmk/arm/pmap/pmap_misc.c
+index dacf3b5..471f6c3 100644
+--- a/osfmk/arm/pmap/pmap_misc.c
++++ b/osfmk/arm/pmap/pmap_misc.c
+@@ -39,6 +39,19 @@
+  */
+ 
+ 
++#if SCHED_HYGIENE_DEBUG && (DEVELOPMENT || DEBUG) && !XNU_MONITOR
++/*
++ * sweet: pmap.h declares this out of line for these configs, but the only
++ * definition ships in Apple's closed per-SoC pmap. Without the PPL there is
++ * no extra state to check.
++ */
++bool
++pmap_pending_preemption(void)
++{
++	return _pmap_pending_preemption_real();
++}
++#endif /* SCHED_HYGIENE_DEBUG && (DEVELOPMENT || DEBUG) && !XNU_MONITOR */
++
+ void
+ pmap_abandon_measurement(void)
+ {
+diff --git a/osfmk/arm64/Makefile b/osfmk/arm64/Makefile
+index 60f4224..4fdd735 100644
+--- a/osfmk/arm64/Makefile
++++ b/osfmk/arm64/Makefile
+@@ -53,6 +53,7 @@ EXPORT_MD_LIST = \
+ 	machine_remote_time.h \
+ 	monotonic.h \
+ 	proc_reg.h \
++	sweet_early.h \
+ 	asm.h \
+ 	speculation.h \
+ 	static_if.h \
+diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
+index 756af52..dd5a4b4 100644
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -41,6 +41,7 @@
+ #include <machine/atomic.h>
+ #include <arm64/proc_reg.h>
+ #include <arm64/lowglobals.h>
++#include <arm64/sweet_early.h>
+ #include <arm/cpu_data_internal.h>
+ #include <arm/misc_protos.h>
+ #include <pexpert/arm64/boot.h>
+@@ -378,10 +379,39 @@ SECURITY_READ_ONLY_LATE(static boolean_t)               kva_active = FALSE;
+ #define ARM64_PAGE_UNGUARDED (0)
+ #define ARM64_PAGE_GUARDED   (1)
+ 
++/*
++ * SWEET bring-up shim: a managed window that crosses 0x100000000 (> 4 GiB)
++ * unmasks latent 32-bit physical-address truncations elsewhere in the kernel
++ * (e.g. 0x57778000 == 0x157778000 & 0xFFFFFFFF, which is below gPhysBase).
++ * Recover the dropped bit 32 so boot continues, and log the caller so the real
++ * truncation site can be found and fixed. TEMPORARY -- it masks a real bug.
++ */
++static pmap_paddr_t __attribute__((noinline))
++sweet_untruncate_pa(pmap_paddr_t pa, const char *who, void *ret)
++{
++	pmap_paddr_t fixed = pa | 0x100000000ULL;
++	if ((pa < gPhysBase) && (fixed >= gPhysBase) && ((fixed - gPhysBase) < real_phys_size)) {
++		/* the first time from each caller (the bug's place; pmap_sync_page_attributes_phys is fixed) */
++		static void *sweet_trunc_callers[16];
++		static int sweet_trunc_n = 0;
++		int k;
++		for (k = 0; k < sweet_trunc_n && sweet_trunc_callers[k] != ret; k++) {
++		}
++		if (k == sweet_trunc_n && sweet_trunc_n < 16) {
++			sweet_trunc_callers[sweet_trunc_n++] = ret;
++			printf("SWEET %s: truncated PA 0x%llx -> 0x%llx caller %p\n",
++			    who, (unsigned long long)pa, (unsigned long long)fixed, ret);
++		}
++		return fixed;
++	}
++	return pa;
++}
++
+ /* "physical to kernel virtual" - given a physical address, return the corresponding physical aperture address */
+ vm_map_address_t
+ phystokv(pmap_paddr_t pa)
+ {
++	pa = sweet_untruncate_pa(pa, "phystokv", __builtin_return_address(0));
+ 
+ 	for (size_t i = 0; (i < PTOV_TABLE_SIZE) && (ptov_table[i].len != 0); i++) {
+ 		if ((pa >= ptov_table[i].pa) && (pa < (ptov_table[i].pa + ptov_table[i].len))) {
+@@ -399,6 +429,7 @@ vm_map_address_t
+ phystokv_range(pmap_paddr_t pa, vm_size_t *max_len)
+ {
+ 
++	pa = sweet_untruncate_pa(pa, "phystokv_range", __builtin_return_address(0));
+ 	vm_size_t len;
+ 	for (size_t i = 0; (i < PTOV_TABLE_SIZE) && (ptov_table[i].len != 0); i++) {
+ 		if ((pa >= ptov_table[i].pa) && (pa < (ptov_table[i].pa + ptov_table[i].len))) {
+@@ -1807,6 +1838,44 @@ init_ptpages(tt_entry_t *tt, vm_map_address_t start, vm_map_address_t end, bool
+ #define ARM64_PHYSMAP_SLIDE_RANGE (1ULL << 30) // 1 GB
+ #define ARM64_PHYSMAP_SLIDE_MASK  (ARM64_PHYSMAP_SLIDE_RANGE - 1)
+ 
++#if XNU_MONITOR
++#define ARM64_PHYSMAP_ALIGNMENT_PADDING 0ULL
++#else
++/*
++ * arm_vm_physmap_slide() preserves each PA's block offset. Each PTOV entry
++ * can therefore consume up to one extra twig of VA space. Reserve that
++ * space in both the aperture bound and its L1 allocation, including the
++ * ARM_LARGE_MEMORY configuration used by SWEET's non-PPL kernel.
++ */
++#define ARM64_PHYSMAP_ALIGNMENT_PADDING (PTOV_TABLE_SIZE * ARM_TT_TWIG_SIZE)
++#endif
++
++#if defined(SWEET)
++/*
++ * The reserved low-globals/kernel region is excluded from VM allocation.
++ * Use the otherwise empty 32MB block above low globals and below gVirtBase
++ * for a Normal-NC framebuffer alias that survives bootstrap TTBR0 teardown.
++ */
++#define SWEET_EARLY_FB_VA (VM_MIN_KERNEL_ADDRESS + ARM_TT_L2_SIZE)
++
++static void
++sweet_early_map_final(void)
++{
++	const vm_map_address_t va = SWEET_EARLY_FB_VA;
++	assert(va + ARM_TT_L2_SIZE <= gVirtBase);
++	tt_entry_t l1 = cpu_tte[(va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT];
++	assert((l1 & (ARM_TTE_VALID | ARM_TTE_TYPE_MASK)) == (ARM_TTE_VALID | ARM_TTE_TYPE_TABLE));
++	tt_entry_t *l2 = (tt_entry_t *)phystokv(l1 & ARM_TTE_TABLE_MASK);
++	tt_entry_t *slot = &l2[(va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT];
++	assert(*slot == ARM_TTE_EMPTY);
++	*slot = 0x9c000000ULL | ARM_TTE_VALID | ARM_TTE_TYPE_BLOCK |
++	    ARM_TTE_BLOCK_SH(SH_OUTER_MEMORY) |
++	    ARM_TTE_BLOCK_ATTRINDX(CACHE_ATTRINDX_WRITECOMB) |
++	    ARM_TTE_BLOCK_AF | ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX;
++	__asm__ volatile("dsb ishst" ::: "memory");
++}
++#endif
++
+ void
+ arm_vm_init(uint64_t memory_size, boot_args * args)
+ {
+@@ -1855,7 +1924,7 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
+ #endif
+ 
+ #if defined(ARM_LARGE_MEMORY)
+-	unsigned long physmap_l1_entries = ((real_phys_size + ARM64_PHYSMAP_SLIDE_RANGE) >> ARM_TT_L1_SHIFT) + 1;
++	unsigned long physmap_l1_entries = ((real_phys_size + ARM64_PHYSMAP_SLIDE_RANGE + ARM64_PHYSMAP_ALIGNMENT_PADDING) >> ARM_TT_L1_SHIFT) + 1;
+ 	physmap_base = VM_MIN_KERNEL_ADDRESS - (physmap_l1_entries << ARM_TT_L1_SHIFT);
+ #else
+ 	physmap_base = phystokv(args->topOfKernelData);
+@@ -1884,10 +1953,10 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
+ #if defined(ARM_LARGE_MEMORY)
+ 	/* For large memory systems with no PPL such as virtual machines */
+ 	static_memory_end = phystokv(args->topOfKernelData);
+-	physmap_end = physmap_base + real_phys_size;
++	physmap_end = physmap_base + real_phys_size + ARM64_PHYSMAP_ALIGNMENT_PADDING;
+ #else
+-	static_memory_end = physmap_base + mem_size + (PTOV_TABLE_SIZE * ARM_TT_TWIG_SIZE); // worst possible case for block alignment
+-	physmap_end = physmap_base + real_phys_size + (PTOV_TABLE_SIZE * ARM_TT_TWIG_SIZE);
++	static_memory_end = physmap_base + mem_size + ARM64_PHYSMAP_ALIGNMENT_PADDING; // worst possible case for block alignment
++	physmap_end = physmap_base + real_phys_size + ARM64_PHYSMAP_ALIGNMENT_PADDING;
+ #endif // ARM_LARGE_MEMORY
+ #endif
+ 
+@@ -2161,18 +2230,28 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
+ 	kasan_init();
+ #endif /* KASAN */
+ 
++#if defined(SWEET)
++	/* phystokv() must still refer to the bootstrap aperture here. */
++	sweet_early_map_final();
++#endif
+ 	arm_vm_physmap_init(args);
+ 	set_mmu_ttb_alternate(cpu_ttep & TTBR_BADDR_MASK);
+ 
+ 	ml_enable_monitor();
+ 
++#if defined(SWEET)
++	/* The final TTBR1 is live; leave the outgoing VA=PA framebuffer alias. */
++	sweet_early_relocate(SWEET_EARLY_FB_VA);
++#endif
+ 	set_mmu_ttb(invalid_ttep & TTBR_BADDR_MASK);
+ 
+ 	flush_mmu_tlb();
++	sweet_early_mark(10, "TTBR0 off; TLB flushed");
+ 	kva_active = TRUE;
+ 	// global table pointers may need to be different due to physical aperture remapping
+ 	cpu_tte = (tt_entry_t*)(phystokv(cpu_ttep));
+ 	invalid_tte = (tt_entry_t*)(phystokv(invalid_ttep));
++	sweet_early_mark(11, "physmap table pointers rebound");
+ 
+ 	// From here on out, we're off the bootstrap translation tables.
+ 
+@@ -2265,7 +2344,9 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
+     }
+ #endif
+ #endif
++	sweet_early_mark(12, "calling pmap_bootstrap");
+ 	pmap_bootstrap(dynamic_memory_begin);
++	sweet_early_mark(13, "pmap_bootstrap done");
+ 
+ 	disable_preemption();
+ 
+@@ -2316,6 +2397,7 @@ arm_vm_init(uint64_t memory_size, boot_args * args)
+ 		va_l1 = va_l2_end;
+ 		cpu_l1_tte++;
+ 	}
++	sweet_early_mark(14, "early I/O page tables ready");
+ 
+ #if defined(KERNEL_INTEGRITY_KTRR) || defined(KERNEL_INTEGRITY_CTRR) || defined(KERNEL_INTEGRITY_PV_CTRR)
+ 	/*
+diff --git a/osfmk/arm64/caches_asm.s b/osfmk/arm64/caches_asm.s
+index 1588830..945046a 100644
+--- a/osfmk/arm64/caches_asm.s
++++ b/osfmk/arm64/caches_asm.s
+@@ -213,6 +213,7 @@ L_ipui_loop:
+ 	.globl EXT(CleanPoC_Dcache)
+ 	.globl EXT(clean_mmu_dcache)
+ LEXT(CleanPoC_Dcache)
++LEXT(clean_mmu_dcache)		/* sweet: was exported without a label */
+ 	ARM64_PROLOG
+ #if  defined(APPLE_ARM64_ARCH_FAMILY)
+ 	dsb		sy
+@@ -354,6 +355,23 @@ LEXT(CleanPoC_DcacheRegion_Force)
+ 	b		EXT(CleanPoC_DcacheRegion_internal)
+ #endif /* APPLE_ARM64_ARCH_FAMILY */
+ 
++#if !defined(APPLE_ARM64_ARCH_FAMILY)
++/*
++ *	void CleanPoC_DcacheRegion_Force_nopreempt(vm_offset_t va, size_t length)
++ *	void CleanPoC_DcacheRegion_Force_nopreempt_nohid(vm_offset_t va, size_t length)
++ *
++ *		sweet: the Apple variants toggle HID bits around DC CVAC; generic
++ *		ARMv8 has no such bits, so both are the plain region clean.
++ */
++	.text
++	.align 2
++	.globl EXT(CleanPoC_DcacheRegion_Force_nopreempt)
++	.globl EXT(CleanPoC_DcacheRegion_Force_nopreempt_nohid)
++LEXT(CleanPoC_DcacheRegion_Force_nopreempt)
++LEXT(CleanPoC_DcacheRegion_Force_nopreempt_nohid)
++	b		EXT(CleanPoC_DcacheRegion_internal)
++#endif /* !APPLE_ARM64_ARCH_FAMILY */
++
+ /*
+  *	void FlushPoC_Dcache(void)
+  *
+diff --git a/osfmk/arm64/cpu.c b/osfmk/arm64/cpu.c
+index 53f9ce5..a8cc5f0 100644
+--- a/osfmk/arm64/cpu.c
++++ b/osfmk/arm64/cpu.c
+@@ -934,6 +934,19 @@ cpu_start(int cpu)
+ 
+ 		flush_dcache((vm_offset_t)&CpuDataEntries[cpu], sizeof(cpu_data_entry_t), FALSE);
+ 		flush_dcache((vm_offset_t)cpu_data_ptr, sizeof(cpu_data_t), FALSE);
++#if defined(SWEET)
++		/* The reset stub loads these through physical addresses with caches off.
++		 * Use VA range cleans to PoC, including on coherent-I/O builds. */
++		extern uint8_t bootstrap_pagetables[BOOTSTRAP_TABLE_SIZE];
++		CleanPoC_DcacheRegion_Force((vm_offset_t)CpuDataEntries, sizeof(CpuDataEntries));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)cpu_data_ptr, sizeof(cpu_data_t));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)&ResetHandlerData, sizeof(ResetHandlerData));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)BootArgs, sizeof(*BootArgs));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)&sysreg_restore, sizeof(sysreg_restore));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)&cpu_ttep, sizeof(cpu_ttep));
++		CleanPoC_DcacheRegion_Force((vm_offset_t)bootstrap_pagetables, BOOTSTRAP_TABLE_SIZE);
++		__builtin_arm_dsb(DSB_SY);
++#endif
+ #if CONFIG_SPTM
+ 		/**
+ 		 * On SPTM devices, CTRR is configured entirely by the SPTM. Due to this, this logic
+@@ -971,6 +984,21 @@ cpu_start(int cpu)
+ }
+ 
+ 
++#if defined(SWEET)
++/* Bring-up observer: the self-SGI clears SIGPdisabled after IRQs unmask. */
++boolean_t sweet_cpu_signal_is_enabled(unsigned int cpu);
++boolean_t
++sweet_cpu_signal_is_enabled(unsigned int cpu)
++{
++	if (cpu >= MAX_CPUS) {
++		return FALSE;
++	}
++	cpu_data_t *cdp = CpuDataEntries[cpu].cpu_data_vaddr;
++	return cdp != NULL && !(os_atomic_load(&cdp->cpu_signal, acquire) & SIGPdisabled);
++}
++#endif
++
++
+ void
+ cpu_timebase_init(boolean_t from_boot)
+ {
+diff --git a/osfmk/arm64/kpc.c b/osfmk/arm64/kpc.c
+index a3bed80..1ac5f54 100644
+--- a/osfmk/arm64/kpc.c
++++ b/osfmk/arm64/kpc.c
+@@ -1,360 +1,159 @@
+ /*
+- * Copyright (c) 2012-2023 Apple Inc. All rights reserved.
+- *
+- * @APPLE_OSREFERENCE_LICENSE_HEADER_START@
+- *
+- * This file contains Original Code and/or Modifications of Original Code
+- * as defined in and that are subject to the Apple Public Source License
+- * Version 2.0 (the 'License'). You may not use this file except in
+- * compliance with the License. The rights granted to you under the License
+- * may not be used to create, or enable the creation or redistribution of,
+- * unlawful or unlicensed copies of an Apple operating system, or to
+- * circumvent, violate, or enable the circumvention or violation of, any
+- * terms of an Apple operating system software license agreement.
+- *
+- * Please obtain a copy of the License at
+- * http://www.opensource.apple.com/apsl/ and read it before using this file.
+- *
+- * The Original Code and all software distributed under the License are
+- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
+- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
+- * Please see the License for the specific language governing rights and
+- * limitations under the License.
+- *
+- * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
++ * sweet: arm64 kpc backend. Apple's osfmk/arm64/kpc.c programs the Apple
++ * PMU (implementation-defined system registers) and ships only in the KDK's
++ * closed per-SoC library. xnu does not build without kperf, and kperf needs
++ * kpc, so this backend reports no counters at all: every class is empty and
++ * every configuration request fails cleanly.
+  */
+ 
+-#include <arm/cpu_data_internal.h>
+-#include <arm/cpu_internal.h>
+-#include <kern/cpu_number.h>
+-#include <kern/kpc.h>
+-#include <kern/thread.h>
+-#include <kern/processor.h>
+ #include <mach/mach_types.h>
+ #include <machine/machine_routines.h>
+-#include <kern/cpc.h>
+-#include <stdint.h>
++#include <kern/processor.h>
+ #include <sys/errno.h>
++#include <kern/kpc.h>
+ 
+-// KPC's implementation is maintained for backwards-compatibility,
+-// but on ARM, its internals have been replaced by CPC.
+-
+-#if HAS_CPMU_PC_CAPTURE
+-int kpc_pc_capture = 1;
+-#else /* HAS_CPMU_PC_CAPTURE */
+ int kpc_pc_capture = 0;
+-#endif /* !HAS_CPMU_PC_CAPTURE */
+-
+-static uint64_t _kpc_read_pmesr(uint32_t counter);
+-
+-#define KPC_ARM64_FIXED_COUNT        (2)
+-#define KPC_ARM64_CONFIGURABLE_COUNT (CPMU_PMC_COUNT - KPC_ARM64_FIXED_COUNT)
+ 
+-#if CPMU_64BIT_PMCS
+-#define KPC_ARM64_COUNTER_WIDTH    (63)
+-#define KPC_ARM64_COUNTER_OVF_BIT  (63)
+-#else // CPMU_64BIT_PMCS
+-#define KPC_ARM64_COUNTER_WIDTH    (47)
+-#define KPC_ARM64_COUNTER_OVF_BIT  (47)
+-#endif // !CPMU_64BIT_PMCS
+-
+-/*
+- * Configuration registers that can be controlled by RAWPMU:
+- *
+- * All: PMCR2-4, OPMAT0-1, OPMSK0-1.
+- * Later: PM_MEMFLT_CTL23, PM_MEMFLT_CTL45, PMEFR2-9.
+- */
+-#if CPMU_EVENT_FILTERING
+-#define RAWPMU_CONFIG_COUNT 17
+-#else /* CPMU_EVENT_FILTERING */
+-#define RAWPMU_CONFIG_COUNT 7
+-#endif /* !CPMU_EVENT_FILTERING */
+-
+-#if CPMU_16BIT_EVENTS
+-#define PMESR_PMC_WIDTH UINT64_C(16)
+-#define PMESR_PMC_MASK  ((uint64_t)UINT16_MAX)
+-#else // CPMU_16BIT_EVENTS
+-#define PMESR_PMC_WIDTH UINT64_C(8)
+-#define PMESR_PMC_MASK  ((uint64_t)UINT8_MAX)
+-#endif // !CPMU_16BIT_EVENTS
+-
+-#define CFGWORD_EL0A32EN_MASK (0x10000)
+-#define CFGWORD_EL0A64EN_MASK (0x20000)
+-#define CFGWORD_EL1EN_MASK    (0x40000)
+-#define CFGWORD_EL3EN_MASK    (0x80000)
+-
+-kpc_config_t
+-kpc_config_arch_process(kpc_config_t config)
++void
++kpc_arch_init(void)
+ {
+-	if (cpc_is_secure()) {
+-		config &= ~CFGWORD_EL1EN_MASK;
+-	}
+-	return config;
+ }
+ 
+-cpc_event_flags_t
+-kpc_config_arch_flags(kpc_config_t config)
++uint32_t
++kpc_get_classes(void)
+ {
+-	// The low 16 bits of a configuration word selects the event.
+-	// Bits 16-19 are mapped to exception level filters.
+-
+-	cpc_event_flags_t flags = CPC_EF_NONE;
+-	// Assume no masks means all masks on.
+-	kpc_config_t all_on = CFGWORD_EL0A64EN_MASK | CFGWORD_EL0A32EN_MASK;
+-	if (!cpc_is_secure()) {
+-		all_on |= CFGWORD_EL1EN_MASK;
+-	}
+-	if ((config & (CFGWORD_EL0A64EN_MASK | CFGWORD_EL0A32EN_MASK |
+-	    CFGWORD_EL1EN_MASK)) == 0) {
+-		config |= all_on;
+-	}
+-	if (!(config & (CFGWORD_EL0A64EN_MASK | CFGWORD_EL0A32EN_MASK))) {
+-		flags |= CPC_EF_NO_USER;
+-	}
+-	if (!(config & CFGWORD_EL1EN_MASK)) {
+-		flags |= CPC_EF_NO_KERNEL;
+-	}
+-	return flags;
++	return 0;
+ }
+ 
+-#pragma mark - Non-CPC
+-
+-static uint32_t kpc_xread_sync;
+-static void
+-kpc_get_curcpu_counters_xcall(void *args)
++int
++kpc_get_pmu_version(void)
+ {
+-	struct kpc_get_counters_remote *handler = args;
+-
+-	assert(handler != NULL);
+-	assert(handler->buf != NULL);
+-
+-	int offset = cpu_number() * handler->buf_stride;
+-	int r = kpc_get_curcpu_counters(handler->classes, NULL, &handler->buf[offset]);
+-
+-	/* number of counters added by this CPU, needs to be atomic  */
+-	os_atomic_add(&(handler->nb_counters), r, relaxed);
+-
+-	if (os_atomic_dec(&kpc_xread_sync, relaxed) == 0) {
+-		thread_wakeup((event_t) &kpc_xread_sync);
+-	}
++	return KPC_PMU_ERROR;
+ }
+ 
+-int
+-kpc_get_all_cpus_counters(uint32_t classes, int *curcpu, uint64_t *buf)
++uint32_t
++kpc_fixed_count(void)
+ {
+-	assert(buf != NULL);
+-
+-	int enabled = ml_set_interrupts_enabled(FALSE);
+-
+-	if (curcpu) {
+-		*curcpu = cpu_number();
+-	}
+-	struct kpc_get_counters_remote hdl = {
+-		.classes = classes,
+-		.nb_counters = 0,
+-		.buf = buf,
+-		.buf_stride = kpc_get_counter_count(classes)
+-	};
+-	cpu_broadcast_xcall(&kpc_xread_sync, TRUE, kpc_get_curcpu_counters_xcall, &hdl);
+-	int offset = hdl.nb_counters;
+-
+-	(void)ml_set_interrupts_enabled(enabled);
+-
+-	return offset;
++	return 0;
+ }
+ 
+ uint32_t
+-kpc_fixed_count(void)
++kpc_fixed_config_count(void)
++{
++	return 0;
++}
++
++uint64_t
++kpc_fixed_max(void)
+ {
+-	return KPC_ARM64_FIXED_COUNT;
++	return 0;
+ }
+ 
+ uint32_t
+ kpc_configurable_count(void)
+ {
+-	return KPC_ARM64_CONFIGURABLE_COUNT;
++	return 0;
+ }
+ 
+ uint32_t
+-kpc_fixed_config_count(void)
++kpc_configurable_config_count(uint64_t pmc_mask __unused)
++{
++	return 0;
++}
++
++uint64_t
++kpc_configurable_max(void)
+ {
+ 	return 0;
+ }
+ 
+ uint32_t
+-kpc_configurable_config_count(uint64_t pmc_mask)
++kpc_rawpmu_config_count(void)
+ {
+-	assert3u(kpc_popcount(pmc_mask), <=, kpc_configurable_count());
+-	return kpc_popcount(pmc_mask);
++	return 0;
+ }
+ 
+ int
+-kpc_get_fixed_config(kpc_config_t *configv __unused)
++kpc_get_rawpmu_config(kpc_config_t *configv __unused)
+ {
+ 	return 0;
+ }
+ 
+-uint64_t
+-kpc_fixed_max(void)
++boolean_t
++kpc_is_running_fixed(void)
+ {
+-	return (1ULL << KPC_ARM64_COUNTER_WIDTH) - 1;
++	return FALSE;
+ }
+ 
+-uint64_t
+-kpc_configurable_max(void)
++boolean_t
++kpc_is_running_configurable(uint64_t pmc_mask __unused)
+ {
+-	return (1ULL << KPC_ARM64_COUNTER_WIDTH) - 1;
++	return FALSE;
+ }
+ 
+ int
+-kpc_get_configurable_config(kpc_config_t *configv, uint64_t pmc_mask)
++kpc_get_fixed_config(kpc_config_t *configv __unused)
+ {
+-	const uint32_t cfg_count = kpc_configurable_count();
+-	const uint32_t offset = kpc_fixed_count();
+-
+-	assert(configv != NULL);
+-
+-	for (uint32_t i = 0; i < cfg_count; ++i) {
+-		if ((1ULL << i) & pmc_mask) {
+-			*configv++ = _kpc_read_pmesr(i + offset);
+-		}
+-	}
+ 	return 0;
+ }
+ 
+-uint32_t
+-kpc_get_classes(void)
++int
++kpc_get_fixed_counters(uint64_t *counterv __unused)
+ {
+-	return KPC_CLASS_FIXED_MASK | KPC_CLASS_CONFIGURABLE_MASK |
+-	       KPC_CLASS_RAWPMU_MASK;
++	return 0;
+ }
+ 
+ int
+-kpc_get_pmu_version(void)
++kpc_get_configurable_config(kpc_config_t *configv __unused, uint64_t pmc_mask __unused)
+ {
+-	return KPC_PMU_ARM_APPLE;
++	return 0;
+ }
+ 
+-#pragma mark - Direct CPMU Access
+-
+-#define PMCR_PMC_8_9_OFFSET     (32)
+-#define PMCR_PMC_8_9_SHIFT(PMC) (((PMC) - 8) + PMCR_PMC_8_9_OFFSET)
+-#define PMCR_PMC_SHIFT(PMC)     (((PMC) <= 7) ? (PMC) : \
+-	                        PMCR_PMC_8_9_SHIFT(PMC))
+-
+-#define PMESR_SHIFT(PMC, OFF)     ((PMESR_PMC_WIDTH) * ((PMC) - (OFF)))
+-#define PMESR_EVT_MASK(PMC, OFF)  (PMESR_PMC_MASK << PMESR_SHIFT(PMC, OFF))
+-#define PMESR_EVT_CLEAR(PMC, OFF) (~PMESR_EVT_MASK(PMC, OFF))
+-
+-#define PMESR_EVT_DECODE(PMESR, PMC, OFF) \
+-	(((PMESR) >> PMESR_SHIFT(PMC, OFF)) & PMESR_PMC_MASK)
+-#define PMESR_EVT_ENCODE(EVT, PMC, OFF) \
+-	(((EVT) & PMESR_PMC_MASK) << PMESR_SHIFT(PMC, OFF))
+-
+-#define PMCR1_EL0_A32_OFFSET (0)
+-#define PMCR1_EL0_A64_OFFSET (8)
+-#define S3_1_C15_C1_0_A64_OFFSET (16)
+-#define PMCR1_EL3_A64_OFFSET (24)
+-
+-#define PMCR1_EL0_A32_SHIFT(PMC) (PMCR1_EL0_A32_OFFSET + PMCR_PMC_SHIFT(PMC))
+-#define PMCR1_EL0_A64_SHIFT(PMC) (PMCR1_EL0_A64_OFFSET + PMCR_PMC_SHIFT(PMC))
+-#define S3_1_C15_C1_0_A64_SHIFT(PMC) (S3_1_C15_C1_0_A64_OFFSET + PMCR_PMC_SHIFT(PMC))
+-#define PMCR1_EL3_A64_SHIFT(PMC) (PMCR1_EL0_A64_OFFSET + PMCR_PMC_SHIFT(PMC))
+-
+-#define PMCR1_EL0_A32_ENABLE_MASK(PMC) (UINT64_C(1) << PMCR1_EL0_A32_SHIFT(PMC))
+-#define PMCR1_EL0_A64_ENABLE_MASK(PMC) (UINT64_C(1) << PMCR1_EL0_A64_SHIFT(PMC))
+-#define S3_1_C15_C1_0_A64_ENABLE_MASK(PMC) (UINT64_C(1) << S3_1_C15_C1_0_A64_SHIFT(PMC))
+-
+-#define SREG_READ(SR)     ({ uint64_t VAL; \
+-	                     __asm__ volatile("mrs %0, " SR : "=r"(VAL)); \
+-	                     VAL; })
+-
+-/*
+- * Configuration registers that can be controlled by RAWPMU:
+- *
+- * All: PMCR2-4, OPMAT0-1, OPMSK0-1.
+- * Later: PM_MEMFLT_CTL23, PM_MEMFLT_CTL45, PMEFR2-9.
+- */
+-#if CPMU_EVENT_FILTERING
+-#define RAWPMU_CONFIG_COUNT 17
+-#else /* CPMU_EVENT_FILTERING */
+-#define RAWPMU_CONFIG_COUNT 7
+-#endif /* !CPMU_EVENT_FILTERING */
+-
+-uint32_t
+-kpc_rawpmu_config_count(void)
++int
++kpc_get_configurable_counters(uint64_t *counterv __unused, uint64_t pmc_mask __unused)
+ {
+-	return RAWPMU_CONFIG_COUNT;
++	return 0;
+ }
+ 
+ int
+-kpc_get_rawpmu_config(kpc_config_t *configv)
++kpc_get_all_cpus_counters(uint32_t classes __unused, int *curcpu, uint64_t *buf __unused)
+ {
+-	configv[0] = SREG_READ("S3_1_C15_C2_0");
+-	configv[1] = SREG_READ("S3_1_C15_C3_0");
+-	configv[2] = SREG_READ("S3_1_C15_C4_0");
+-	configv[3] = SREG_READ("S3_1_C15_C7_0");
+-	configv[4] = SREG_READ("S3_1_C15_C8_0");
+-	configv[5] = SREG_READ("S3_1_C15_C9_0");
+-	configv[6] = SREG_READ("S3_1_C15_C10_0");
+-#if CPMU_EVENT_FILTERING
+-	configv[7] = SREG_READ("PM_MEMFLT_CTL23_EL1");
+-	configv[8] = SREG_READ("PM_MEMFLT_CTL45_EL1");
+-	/*
+-	 * Use coproc addresses for PMEFR{2,9} instead of register names due to rdar://152681387
+-	 */
+-	configv[9] = SREG_READ("S3_2_C15_C2_1");
+-	configv[10] = SREG_READ("S3_2_C15_C3_1");
+-	configv[11] = SREG_READ("S3_2_C15_C4_1");
+-	configv[12] = SREG_READ("S3_2_C15_C5_1");
+-	configv[13] = SREG_READ("S3_2_C15_C6_1");
+-	configv[14] = SREG_READ("S3_2_C15_C7_1");
+-	configv[15] = SREG_READ("S3_2_C15_C8_1");
+-	configv[16] = SREG_READ("S3_2_C15_C9_1");
+-#endif /* CPMU_EVENT_FILTERING */
++	if (curcpu) {
++		*curcpu = cpu_number();
++	}
+ 	return 0;
+ }
+ 
+-static uint64_t
+-_kpc_read_pmesr(uint32_t counter)
++int
++kpc_set_config_arch(struct kpc_config_remote *mp_config __unused)
+ {
+-	uint64_t pmesr;
++	return ENOTSUP;
++}
+ 
+-	switch (counter) {
+-	case 2:
+-	case 3:
+-	case 4:
+-	case 5:
+-		pmesr = PMESR_EVT_DECODE(SREG_READ("S3_1_C15_C5_0"), counter, 2);
+-		break;
+-	case 6:
+-	case 7:
+-#if KPC_ARM64_CONFIGURABLE_COUNT > 6
+-	case 8:
+-	case 9:
+-#endif // KPC_ARM64_CONFIGURABLE_COUNT > 6
+-		pmesr = PMESR_EVT_DECODE(SREG_READ("S3_1_C15_C6_0"), counter, 6);
+-		break;
+-	default:
+-		pmesr = 0;
+-		break;
+-	}
++int
++kpc_set_period_arch(struct kpc_config_remote *mp_config __unused)
++{
++	return ENOTSUP;
++}
+ 
+-	kpc_config_t config = pmesr;
++int
++kpc_set_running_arch(struct kpc_running_remote *mp_config __unused)
++{
++	return ENOTSUP;
++}
+ 
+-	uint64_t pmcr1 = SREG_READ("S3_1_C15_C1_0");
++int
++kpc_set_sw_inc(uint32_t mask __unused)
++{
++	return ENOTSUP;
++}
+ 
+-	if (pmcr1 & PMCR1_EL0_A32_ENABLE_MASK(counter)) {
+-		config |= CFGWORD_EL0A32EN_MASK;
+-	}
+-	if (pmcr1 & PMCR1_EL0_A64_ENABLE_MASK(counter)) {
+-		config |= CFGWORD_EL0A64EN_MASK;
+-	}
+-	if (pmcr1 & S3_1_C15_C1_0_A64_ENABLE_MASK(counter)) {
+-		config |= CFGWORD_EL1EN_MASK | CFGWORD_EL3EN_MASK;
+-	}
++void
++kpc_idle(void)
++{
++}
+ 
+-	return config;
++void
++kpc_idle_exit(void)
++{
+ }
+diff --git a/osfmk/arm64/machine_routines.c b/osfmk/arm64/machine_routines.c
+index 07143d5..2c4a753 100644
+--- a/osfmk/arm64/machine_routines.c
++++ b/osfmk/arm64/machine_routines.c
+@@ -1154,6 +1154,16 @@ ml_parse_cpu_topology(void)
+ 	const boolean_t cpus_boot_arg_present = PE_parse_boot_argn("cpus", &cpu_boot_arg, sizeof(cpu_boot_arg));
+ 	const boolean_t cpumask_boot_arg_present = PE_parse_boot_argn("cpumask", &cpumask_boot_arg, sizeof(cpumask_boot_arg));
+ 
++#if defined(SWEET)
++	/* Opt in to SMP: cpus=N (N <= SWEET_SMP_MAX_CPUS; cores 6-7 are the A76s). */
++	if (!cpus_boot_arg_present || cpu_boot_arg == 0) {
++		cpu_boot_arg = 1;
++	}
++	if (cpu_boot_arg > SWEET_SMP_MAX_CPUS) {
++		cpu_boot_arg = SWEET_SMP_MAX_CPUS;
++	}
++#endif
++
+ 	// The cpus=N and cpumask=N boot args cannot be used simultaneously. Flag this
+ 	// so that we trigger a panic later in the boot process, once serial is enabled.
+ 	if (cpus_boot_arg_present && cpumask_boot_arg_present) {
+@@ -1289,10 +1299,16 @@ ml_parse_cpu_topology(void)
+ 		}
+ #endif
+ 
++#if defined(SWEET)
++		/* Aff1 encodes the core on SM7150, not an Apple cluster ID. */
++		cpu->die_cluster_id = (int)ml_readprop(child, "die-cluster-id", 0);
++		cpu->cluster_core_id = (int)ml_readprop(child, "cluster-core-id", cpu->phys_id >> 8);
++#else
+ 		cpu->die_cluster_id = (int)ml_readprop(child, "die-cluster-id", MPIDR_CLUSTER_ID(cpu->phys_id));
+ 		cluster->die_cluster_id = cpu->die_cluster_id;
+ 
+ 		cpu->cluster_core_id = (int)ml_readprop(child, "cluster-core-id", MPIDR_CPU_ID(cpu->phys_id));
++#endif
+ 
+ 		cpu->cpu_pset_id = PSET_ID_INVALID; /* initialized by ml_bootstrap_processors() */
+ 
+@@ -2622,6 +2638,18 @@ ml_get_decrementer(void)
+ 	return dec;
+ }
+ 
++#if defined(SWEET)
++/*
++ * sweet: arm_vm_init() calls this unconditionally; Apple's definition (it
++ * enters the PPL/monitor) ships only in the closed per-SoC library. There is
++ * no monitor on SWEET.
++ */
++void
++ml_enable_monitor(void)
++{
++}
++#endif /* SWEET */
++
+ boolean_t
+ ml_get_timer_pending(void)
+ {
+diff --git a/osfmk/arm64/proc_reg.h b/osfmk/arm64/proc_reg.h
+index f4d148b..3118993 100644
+--- a/osfmk/arm64/proc_reg.h
++++ b/osfmk/arm64/proc_reg.h
+@@ -243,6 +243,14 @@
+ /* D-Cache, 128KB for Acc8 PCore, 8-way. 64KB for ECore, 8-way. */
+ #define MMU_CLINE   6                      /* cache line size is 1<<MMU_CLINE (64) */
+ 
++#elif defined (SWEET) /* Qualcomm Kryo 470: Cortex-A76 + Cortex-A55 */
++
++/* I-Cache. */
++#define MMU_I_CLINE 6
++
++/* D-Cache. */
++#define MMU_CLINE   6
++
+ #elif defined (VMAPPLE)
+ 
+ /* I-Cache. */
+diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
+index 0554aa8..1524d89 100644
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -32,6 +32,7 @@
+ #include <arm/misc_protos.h>
+ #include <arm/thread.h>
+ #include <arm/rtclock.h>
++#include <arm/machine_cpu.h>
+ #include <arm/trap_internal.h> /* for IS_ARM_GDB_TRAP() et al */
+ #include <arm64/proc_reg.h>
+ #include <arm64/machine_machdep.h>
+@@ -2999,6 +3000,90 @@ handle_simd_trap(arm_saved_state_t *state, uint64_t esr)
+ 	__builtin_unreachable();
+ }
+ 
++#if defined(SWEET)
++/*
++ * The SWEET profiler (bsd/dev/sweet_prof.c): while a task is named here, every interrupt that comes
++ * while one of its threads runs notes where it was (pc, lr, which thread; cpu with bit 31 set:
++ * it was in the kernel, for it) -- where that task spends its processor time, as kperf's timer
++ * sampling would say. Nothing is noted otherwise.
++ */
++struct sweet_prof_sample {
++	uint64_t pc, lr;
++	uint32_t tid, cpu;
++	uint64_t when;          /* mach_absolute_time() */
++	uint64_t up[4];         /* a sample in the kernel: the return addresses of the four frames above */
++	uint64_t upc, ulr;      /* ... and where its thread is in user space (the call that brought it in) */
++};
++#define SWEET_PROF_MAX 16384
++task_t                    sweet_prof_target;
++volatile uint32_t         sweet_prof_n;
++struct sweet_prof_sample  sweet_prof_buf[SWEET_PROF_MAX];
++
++/* "BIGCORES" (sweet_prof.c): whatever runs on cpu 6 and 7, any task -- its name, priority, thread */
++volatile int sweet_prof_bigcores;
++extern void *get_bsdtask_info(task_t);
++extern char *proc_name_address(void *p);
++
++static inline void
++sweet_prof_irq(arm_saved_state_t *state)
++{
++	uint32_t i;
++	if (__improbable(sweet_prof_bigcores) && cpu_number() >= 6) {
++		void *bsd = get_bsdtask_info(current_task());
++		const char *name = bsd != NULL ? proc_name_address(bsd) : "?";
++		uint64_t comm = 0;
++		i = os_atomic_inc_orig(&sweet_prof_n, relaxed);
++		if (i < SWEET_PROF_MAX) {
++			for (int k = 0; k < 8 && name != NULL && name[k] != 0; k++) {
++				comm |= (uint64_t)(uint8_t)name[k] << (8 * k);
++			}
++			sweet_prof_buf[i].pc = comm;
++			sweet_prof_buf[i].lr = (uint64_t)(uint32_t)current_thread()->sched_pri |
++			    ((PSR64_IS_USER(get_saved_state_cpsr(state)) ? 0ull : 1ull) << 32);
++			sweet_prof_buf[i].tid = (uint32_t)thread_tid(current_thread());
++			sweet_prof_buf[i].cpu = (uint32_t)cpu_number();
++			sweet_prof_buf[i].when = mach_absolute_time();
++		}
++		return;
++	}
++	if (current_task() != sweet_prof_target || sweet_prof_target == TASK_NULL) {
++		return;
++	}
++	i = os_atomic_inc_orig(&sweet_prof_n, relaxed);
++	if (i < SWEET_PROF_MAX) {
++		sweet_prof_buf[i].pc = get_saved_state_pc(state);
++		sweet_prof_buf[i].lr = get_saved_state_lr(state);
++		sweet_prof_buf[i].tid = (uint32_t)thread_tid(current_thread());
++		sweet_prof_buf[i].cpu = (uint32_t)cpu_number() | (PSR64_IS_USER(get_saved_state_cpsr(state)) ? 0u : 0x80000000u);
++		sweet_prof_buf[i].when = mach_absolute_time();
++		{
++			/* in the kernel: the frame pointer chain, as far as it stays on this thread's kernel stack */
++			uint64_t fp = get_saved_state_fp(state);
++			vm_offset_t lo = current_thread()->kernel_stack, hi = lo + kernel_stack_size;
++			for (int k = 0; k < 4; k++) {
++				sweet_prof_buf[i].up[k] = 0;
++			}
++			sweet_prof_buf[i].upc = sweet_prof_buf[i].ulr = 0;
++			if (!PSR64_IS_USER(get_saved_state_cpsr(state))) {
++				arm_saved_state_t *user = get_user_regs(current_thread());
++				if (user != NULL) {
++					sweet_prof_buf[i].upc = get_saved_state_pc(user);
++					sweet_prof_buf[i].ulr = get_saved_state_lr(user);
++				}
++				for (int k = 0; k < 4 && fp >= lo && fp + 16 <= hi && (fp & 7) == 0; k++) {
++					uint64_t next = ((uint64_t *)fp)[0], ret = ((uint64_t *)fp)[1];
++					sweet_prof_buf[i].up[k] = ret;
++					if (next <= fp) {
++						break;
++					}
++					fp = next;
++				}
++			}
++		}
++	}
++}
++#endif
++
+ void
+ sleh_irq(arm_saved_state_t *state)
+ {
+@@ -3008,6 +3093,46 @@ sleh_irq(arm_saved_state_t *state)
+ #endif
+ 
+ 
++#if defined(SWEET)
++	/*
++	 * sweet: TrustZone owns GIC Group 0, so the timer and IPIs that other
++	 * ARM64 targets take as FIQs arrive here as Group 1 IRQs.
++	 */
++	uint64_t iar = __builtin_arm_rsr64("ICC_IAR1_EL1");
++	uint32_t intid = (uint32_t)(iar & 0xFFFFFF);
++
++	if (__improbable(sweet_prof_target != TASK_NULL || sweet_prof_bigcores)) {
++		sweet_prof_irq(state);
++	}
++
++	if (intid >= 1020 && intid <= 1023) {
++		return; /* spurious */
++	}
++	if (intid == sweet_vtimer_intid) {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_TIMER);
++		cdp->cpu_decrementer = -1; /* Large */
++		INTERRUPT_MASKED_DEBUG_START(rtclock_intr, DBG_INTR_TYPE_TIMER);
++		rtclock_intr(TRUE);
++		INTERRUPT_MASKED_DEBUG_END();
++		__builtin_arm_wsr64("ICC_EOIR1_EL1", iar);
++	} else if (intid < 16) {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_IPI);
++		/* Ack before handling so an IPI raised meanwhile is not lost */
++		__builtin_arm_wsr64("ICC_EOIR1_EL1", iar);
++		__builtin_arm_isb(ISB_SY);
++		cpu_signal_handler();
++	} else {
++		sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_OTHER);
++		if (cdp->interrupt_handler) {
++			cdp->interrupt_handler(cdp->interrupt_target,
++			    cdp->interrupt_refCon,
++			    cdp->interrupt_nub,
++			    intid);
++		}
++		__builtin_arm_wsr64("ICC_EOIR1_EL1", iar);
++	}
++	__builtin_arm_isb(ISB_SY);
++#else
+ 	sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_OTHER);
+ 
+ #if USE_APPLEARMSMP
+@@ -3019,6 +3144,7 @@ sleh_irq(arm_saved_state_t *state)
+ 	    cdp->interrupt_nub,
+ 	    cdp->interrupt_source);
+ #endif
++#endif /* SWEET */
+ 
+ 	entropy_collect();
+ 
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index 6aa6fe4..e37dec7 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -143,8 +143,8 @@ LEXT(reset_vector)
+ 	adrp	x19, EXT(ResetHandlerData)@page			// Get address of the reset handler data
+ 	add		x19, x19, EXT(ResetHandlerData)@pageoff
+ 	mrs		x15, MPIDR_EL1						// Load MPIDR to get CPU number
+-#if HAS_CLUSTER
+-	and		x0, x15, #0xFFFF					// CPU number in Affinity0, cluster ID in Affinity1
++#if HAS_CLUSTER || defined(SWEET)
++	and		x0, x15, #0xFFFF					// Full Aff1:Aff0 (SWEET: core in Aff1)
+ #else
+ 	and		x0, x15, #0xFF						// CPU number is in MPIDR Affinity Level 0
+ #endif
+@@ -207,8 +207,8 @@ Lskip_cpu_reset_handler:
+ 	.align 3
+ 	.global EXT(LowResetVectorEnd)
+ LEXT(LowResetVectorEnd)
+-	.global	EXT(SleepToken)
+ #if WITH_CLASSIC_S2R
++	.global	EXT(SleepToken)
+ LEXT(SleepToken)
+ 	.space	(stSize_NUM),0
+ #endif
+@@ -289,6 +289,55 @@ LEXT(LowExceptionVectorBase)
+ LEXT(bootstrap_instructions)
+ 
+ #endif /* defined(KERNEL_INTEGRITY_KTRR) || defined(KERNEL_INTEGRITY_CTRR) || defined(KERNEL_INTEGRITY_PV_CTRR) */
++#if defined(SWEET)
++/* PSCI CPU_ON entry (physical): x0=context_id, no stack, MMU/caches off.
++ * Keep this separate from __start (which requires x0=boot_args PA).
++ * Firmware may return at EL1 or EL2; check before accessing EL1 state.
++ * The EL2 path assumes no resident hypervisor and CNTVOFF_EL2=0 on boot.
++ */
++	.align 2
++	.globl EXT(sweet_secondary_entry)
++LEXT(sweet_secondary_entry)
++	msr		DAIFSet, #0xf
++	mrs		x1, CurrentEL
++	cmp		x1, #0x4
++	b.eq	Lsweet_secondary_el1
++	cmp		x1, #0x8
++	b.ne	Lsweet_secondary_bad_el
++	adrp	x1, EXT(LowExceptionVectorBase)@page
++	add		x1, x1, EXT(LowExceptionVectorBase)@pageoff
++	msr		VBAR_EL2, x1
++	/* No stage 2, AArch64 EL1, no EL2 interrupt or FP/debug traps. */
++	mov		x1, #(1 << 31)
++	msr		HCR_EL2, x1
++	msr		VTTBR_EL2, xzr
++	msr		CPTR_EL2, xzr
++	msr		MDCR_EL2, xzr
++	mov		x1, #3
++	msr		CNTHCTL_EL2, x1
++	msr		CNTVOFF_EL2, xzr
++	/* Permit ICC_SRE_EL1 and GIC CPU interface system-register access. */
++	mrs		x1, ICC_SRE_EL2
++	orr		x1, x1, #1
++	orr		x1, x1, #8
++	msr		ICC_SRE_EL2, x1
++	/* Known Armv8 SCTLR RES1 bits, M/C/I off, little endian. */
++	MOV64	x1, 0x30d00800
++	msr		SCTLR_EL1, x1
++	isb
++	adrp	x1, Lsweet_secondary_el1@page
++	add		x1, x1, Lsweet_secondary_el1@pageoff
++	msr		ELR_EL2, x1
++	mov		x1, #0x3c5			// DAIF masked, AArch64 EL1h
++	msr		SPSR_EL2, x1
++	eret
++Lsweet_secondary_bad_el:
++	b		.
++Lsweet_secondary_el1:
++	/* x0 is deliberately unused; reset_vector selects CPU data by MPIDR. */
++	msr		SPSel, #1
++	b		EXT(LowResetVectorBase)
++#endif /* SWEET */
+ 	.align 2
+ 	.globl EXT(resume_idle_cpu)
+ LEXT(resume_idle_cpu)
+@@ -474,6 +523,25 @@ LEXT(start_first_cpu)
+ 	mov		x20, x0
+ 	mov		x21, #0
+ 
++#if defined(SWEET)
++	/* Stage 0: white 64x32 band, no stack or page tables needed. */
++	MOV64	x0, (0x9c000000 + 2368 * 4320)
++	mov		w1, #-1
++	mov		x2, #32
++	mov		x4, #4320
++Lsweet_mark_row:
++	mov		x3, #64
++	mov		x5, x0
++Lsweet_mark_pixel:
++	str		w1, [x5], #4
++	subs	x3, x3, #1
++	b.ne	Lsweet_mark_pixel
++	add		x0, x0, x4
++	subs	x2, x2, #1
++	b.ne	Lsweet_mark_row
++	dsb		sy
++#endif
++
+ 	// Set low reset vector before attempting any loads
+ 	adrp	x0, EXT(LowExceptionVectorBase)@page
+ 	add		x0, x0, EXT(LowExceptionVectorBase)@pageoff
+@@ -620,6 +688,23 @@ Lkernelcache_base_found:
+ 	lsr		x5,  x24, #(ARM_TT_L2_SHIFT)
+ 	create_bootstrap_mapping x14, x15, x5, x3, x2, x9, x10, x11, x12, x13
+ 
++#if defined(SWEET)
++	/*
++	 * Splash framebuffer: one 32MB Normal-NC block in the EXISTING V=P
++	 * L2 table. Both framebuffer and RAM use L1 index 0; another call to
++	 * create_bootstrap_mapping would replace the RAM L2 table.
++	 * SWEET uses 16K pages and all bring-up RAM is below 4GB, so the first
++	 * V=P L2 page is bootstrap_pagetables + 2*PGBYTES.
++	 */
++	MOV64	x10, 0x9c000000
++	MOV64	x11, (ARM_TTE_TYPE_BLOCK | ARM_TTE_VALID | ARM_TTE_BLOCK_SH(SH_OUTER_MEMORY) | ARM_TTE_BLOCK_ATTRINDX(CACHE_ATTRINDX_WRITECOMB) | ARM_TTE_BLOCK_AF | ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX)
++	orr		x11, x11, x10
++	and		x12, x10, #(ARM_TT_L2_INDEX_MASK)
++	lsr		x12, x12, #(ARM_TT_L2_SHIFT)
++	add		x13, x25, #(2 * PGBYTES)
++	str		x11, [x13, x12, lsl #TTE_SHIFT]
++#endif
++
+ 	/* Ensure TTEs are visible */
+ 	dsb		ish
+ 
+@@ -714,6 +799,12 @@ common_start:
+ 	ic		iallu
+ #endif
+ 
++#if defined(SWEET)
++	/* Complete local TLB/I-cache invalidation before enabling the MMU. */
++	dsb		sy
++	isb
++#endif
++
+ 	/* If x21 is not 0, then this is either the start_cpu path or
+ 	 * the resume_idle_cpu path.  cpu_ttep should already be
+ 	 * populated, so just switch to the kernel_pmap now.
+@@ -749,14 +840,19 @@ common_start:
+ 
+ 	// Enable caches, MMU, ROP and JOP
+ 	MOV64   x0, SCTLR_EL1_DEFAULT
++	/* SWEET: allow EL0 to read CTR_EL0 (SCTLR_EL1.UCT, bit15) and do EL0 cache
++	 * maintenance (SCTLR_EL1.UCI, bit26) -- turnip/Mesa CPU-detect reads CTR_EL0
++	 * (mrs x8, ctr_el0) which otherwise traps to SIGILL. */
++	orr		x0, x0, #0x8000
++	orr		x0, x0, #0x4000000
+ 	MSR_SCTLR_EL1_X0
+ 	isb		sy
+ 
+-#if !VMAPPLE
++#if !VMAPPLE && !defined(SWEET)
+ 	MOV64	x1, SCTLR_EL1_DEFAULT
+ 	cmp		x0, x1
+ 	bne		.
+-#endif /* !VMAPPLE */
++#endif /* !VMAPPLE && !SWEET */
+ 
+ #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
+ 	/* Watchtower
+diff --git a/osfmk/conf/files.arm64 b/osfmk/conf/files.arm64
+index 878b515..defad01 100644
+--- a/osfmk/conf/files.arm64
++++ b/osfmk/conf/files.arm64
+@@ -52,6 +52,7 @@ osfmk/arm64/dbgwrap.c		standard
+ osfmk/arm/arm_timer.c		standard
+ osfmk/arm/arm_init.c	optional config_pmap_ppl
+ osfmk/arm64/arm_vm_init.c	optional config_pmap_ppl
++osfmk/arm64/sweet_early.c	standard
+ osfmk/arm64/arm64_hypercall.c	standard
+ osfmk/arm/io_map.c		standard
+ osfmk/arm64/loose_ends.c	standard
+diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
+index 7784e72..85af30f 100644
+--- a/osfmk/console/serial_console.c
++++ b/osfmk/console/serial_console.c
+@@ -275,9 +275,25 @@ _cnputc(char c, bool poll)
+  *             waiting for an interrupt when the hardware device isn't ready
+  * @param size The number of characters to print to the console.
+  */
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++extern void sweet_log_append(const char *c, int size);  /* bsd/dev/sweet_ufs.c */
++/*
++ * Set by AppleCLCD (boot-arg sweetfb_noconsole=1) once the GUI presents:
++ * console text still goes to the persistent log, but is not drawn over
++ * the GUI. A panic draws again.
++ */
++int sweet_console_muted;
++#endif
++
+ static inline void
+ _cnputs(char *c, int size, bool poll)
+ {
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++	sweet_log_append(c, size);
++	if (sweet_console_muted && !panic_active()) {
++		return;
++	}
++#endif
+ 	if (disableConsoleOutput) {
+ 		return;
+ 	}
+diff --git a/osfmk/ipc/ipc_kmsg.c b/osfmk/ipc/ipc_kmsg.c
+index 190e5d2..b737009 100644
+--- a/osfmk/ipc/ipc_kmsg.c
++++ b/osfmk/ipc/ipc_kmsg.c
+@@ -611,6 +611,27 @@ ipc_kmsg_sign_descriptors(
+ #endif /* __has_feature(ptrauth_calls) */
+ }
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++/*
++ * SWEET: every message is signed when it is sent and the signature checked when it is received,
++ * a hardening against a corrupted kmsg. On a PAC device that is a few instructions; here (no
++ * ptrauth) it is a SHA-256 in software of the header, body and trailer, both ways -- 3% of the
++ * window server's render thread, which sends and receives a message for every IOSurface call.
++ * Off on this port; boot-arg sweetikmsig=1 has it back. (Decided once, the same for both ends.)
++ */
++#include <pexpert/pexpert.h>
++static int sweet_ikm_sig = -1;
++static bool
++sweet_ikm_signed(void)
++{
++	if (__improbable(sweet_ikm_sig < 0)) {
++		int v = 0;
++		sweet_ikm_sig = PE_parse_boot_argn("sweetikmsig", &v, sizeof(v)) && v != 0;
++	}
++	return sweet_ikm_sig != 0;
++}
++#endif
++
+ static void
+ ipc_kmsg_relocate_descriptors(
+ 	mach_msg_kdescriptor_t *dst_dsc,
+diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
+index 48f9405..e816c9f 100644
+--- a/osfmk/kern/debug.c
++++ b/osfmk/kern/debug.c
+@@ -86,6 +86,9 @@
+ #include <stdatomic.h>
+ #include <sys/pgo.h>
+ #include <console/serial_protos.h>
++#if defined(__arm64__)
++#include <arm64/sweet_early.h>
++#endif
+ #include <IOKit/IOBSD.h>
+ #include <libkern/crc.h>
+ 
+@@ -1253,6 +1256,11 @@ panic_trap_to_debugger(const char *panic_format_str, va_list *panic_args, unsign
+ {
+ #pragma clang diagnostic pop
+ 
++#if defined(SWEET)
++	/* No CPU/thread/debugger state is required for this first panic copy. */
++	sweet_early_panic(panic_format_str, panic_args);
++#endif
++
+ #if defined(__x86_64__) && (DEVELOPMENT || DEBUG)
+ 	read_lbr();
+ #endif
+diff --git a/osfmk/kern/exception.c b/osfmk/kern/exception.c
+index 29d7dbe..8472075 100644
+--- a/osfmk/kern/exception.c
++++ b/osfmk/kern/exception.c
+@@ -78,6 +78,7 @@
+ #include <kern/ipc_tt.h>
+ #include <kern/task.h>
+ #include <kern/thread.h>
++#include <kern/recount.h>
+ #include <kern/processor.h>
+ #include <kern/sched.h>
+ #include <kern/sched_prim.h>
+@@ -960,6 +961,247 @@ exception_triage(
+ 	return exception_triage_thread(exception, code, codeCnt, thread);
+ }
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++#include <vm/vm_shared_region.h>
++#include <arm/thread.h>
++
++/*
++ * SWEET crash report on the console. The phone has no way to get crash
++ * logs off the device, and corpses stop after a few crashes, so print what
++ * symbolication needs: user registers, a frame-pointer backtrace, the
++ * shared cache slide (unslid = pc - slide) and the main binary's Mach-O
++ * header (offset = pc - mh). Called from proc_prepareexit on the exiting
++ * (crashing) thread.
++ */
++void sweet_crash_log(const char *name, int pid, int sig, uint64_t code, uint64_t subcode);
++static void sweet_crash_strings(const char *name);
++
++void
++sweet_crash_log(const char *name, int pid, int sig, uint64_t code, uint64_t subcode)
++{
++	thread_t thread = current_thread();
++	task_t task = current_task();
++	arm_saved_state_t *ss = find_user_regs(thread);
++	uint64_t slide = 0, mh = task->mach_header_vm_address;
++
++	vm_shared_region_t sr = vm_shared_region_get(task);
++	if (sr != NULL) {
++		slide = sr->sr_slide;
++		vm_shared_region_deallocate(sr);
++	}
++	printf("CRASH %s[%d] sig %d code 0x%llx sub 0x%llx slide 0x%llx mh 0x%llx\n",
++	    name, pid, sig, code, subcode, slide, mh);
++	if (ss == NULL || !is_saved_state64(ss)) {
++		return;
++	}
++	uint64_t fp = get_saved_state_fp(ss);
++	printf("CRASH %s pc 0x%llx lr 0x%llx sp 0x%llx fp 0x%llx far 0x%llx\n", name,
++	    get_saved_state_pc(ss), get_saved_state_lr(ss), get_saved_state_sp(ss), fp,
++	    (uint64_t)saved_state64(ss)->far);
++
++	char line[200];
++	int n = snprintf(line, sizeof(line), "CRASH %s bt", name);
++	for (int i = 0; i < 10 && fp != 0 && (fp & 7) == 0 && n < (int)sizeof(line) - 20; i++) {
++		uint64_t frame[2];
++		if (copyin((user_addr_t)fp, frame, sizeof(frame)) != 0) {
++			break;
++		}
++		n += snprintf(line + n, sizeof(line) - n, " 0x%llx", frame[1]);
++		if (frame[0] <= fp) {
++			break;
++		}
++		fp = frame[0];
++	}
++	printf("%s\n", line);
++
++	if (sig == 11 || sig == 10) {
++		/* Which mapping the faulting address is in, or which two it falls between. */
++		uint64_t far = (uint64_t)saved_state64(ss)->far;
++		vm_map_t map = current_map();
++		vm_map_entry_t entry;
++		vm_map_lock_read(map);
++		bool inside = vm_map_lookup_entry(map, (vm_map_offset_t)far, &entry);
++		for (int i = 0; i < 2 && entry != vm_map_to_entry(map); i++) {
++			printf("CRASH %s map%s 0x%llx-0x%llx prot %d/%d tag %d\n", name,
++			    inside && i == 0 ? " (far inside)" : (i == 0 ? " before far" : " after far"),
++			    (uint64_t)entry->vme_start, (uint64_t)entry->vme_end, entry->protection,
++			    entry->max_protection, (int)VME_ALIAS(entry));
++			if (inside) {
++				break;
++			}
++			entry = entry->vme_next;
++		}
++		vm_map_unlock_read(map);
++	}
++	if (sig == 6 || sig == 5) {
++		sweet_crash_strings(name);
++	}
++}
++
++/*
++ * SWEET: for a process named in boot-arg sweetscan (comma separated,
++ * default "backboardd,SpringBoard"; "-" = off) that dies with SIGABRT or
++ * SIGTRAP (BSAssert / NSAssert style failures) print the printable text runs
++ * (>= 24 characters, at least 2 spaces) found in its malloc heap as
++ * "STR text", at most 700 lines. An uncaught NSException's reason string
++ * is among them: the abort message only carries the exception's type.
++ */
++static void
++sweet_crash_strings(const char *name)
++{
++	static char names[128];
++	char *buf;
++	vm_map_t map = current_map();
++	vm_map_offset_t addr = 0;
++	uint64_t scanned = 0;
++	int lines = 0;
++	char last[96] = "";
++
++	if (!PE_parse_boot_argn("sweetscan", names, sizeof(names))) {
++		strlcpy(names, "backboardd,SpringBoard", sizeof(names));
++	}
++	size_t n = strlen(name), found = 0;
++	for (const char *t = names; *t;) {
++		const char *end = strchr(t, ',');
++		size_t tl = end ? (size_t)(end - t) : strlen(t);
++		if (tl == n && n > 0 && strncmp(t, name, n) == 0) {
++			found = 1;
++			break;
++		}
++		if (!end) {
++			break;
++		}
++		t = end + 1;
++	}
++	if (!found) {
++		return;
++	}
++	buf = kalloc_data(65536, Z_WAITOK);
++	if (buf == NULL) {
++		return;
++	}
++	printf("STR scan of %s heap\n", name);
++	while (lines < 700 && scanned < (96ull << 20)) {
++		vm_map_size_t size = 0;
++		natural_t depth = 0;
++		vm_region_submap_info_data_64_t info;
++		mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_V2_COUNT_64;
++
++		if (vm_map_region_recurse_64(map, &addr, &size, &depth,
++		    (vm_region_submap_info_64_t)&info, &count) != KERN_SUCCESS) {
++			break;
++		}
++		vm_map_offset_t base = addr;
++		addr += size;
++		if (info.is_submap || (info.protection & (VM_PROT_READ | VM_PROT_WRITE)) !=
++		    (VM_PROT_READ | VM_PROT_WRITE) || info.user_tag < 1 || info.user_tag > 11) {
++			continue;
++		}
++		for (vm_map_offset_t off = 0; off < size && lines < 700; off += 65536) {
++			size_t len = (size - off) < 65536 ? (size_t)(size - off) : 65536;
++			if (copyin((user_addr_t)(base + off), buf, len) != 0) {
++				continue;
++			}
++			scanned += len;
++			size_t start = 0;
++			int spaces = 0;
++			for (size_t i = 0; i <= len; i++) {
++				bool ok = i < len && ((unsigned char)buf[i] >= 0x20 && (unsigned char)buf[i] < 0x7f);
++				if (ok) {
++					spaces += buf[i] == ' ';
++					continue;
++				}
++				size_t run = i - start;
++				if (run >= 24 && spaces >= 2) {
++					char text[160];
++					size_t m = run < sizeof(text) - 1 ? run : sizeof(text) - 1;
++					memcpy(text, buf + start, m);
++					text[m] = 0;
++					if (strncmp(text, last, sizeof(last) - 1) != 0) {
++						printf("STR %s\n", text);
++						lines++;
++						strlcpy(last, text, sizeof(last));
++					}
++				}
++				start = i + 1;
++				spaces = 0;
++			}
++		}
++	}
++	printf("STR done: %llu KiB scanned, %d strings\n", scanned >> 10, lines);
++	kfree_data(buf, 65536);
++}
++/*
++ * SWEET process sampler (bsd/dev/sweet_sample.c): user pc/lr/sp and a frame
++ * pointer backtrace of every thread of a task, from the saved user state.
++ */
++void sweet_sample_task(const char *name, int pid, task_t task);
++
++
++/* bsd/dev/sweet_prof.c: every thread's processor time so far (user + system, mach units). */
++int sweet_task_thread_times(task_t task, uint64_t *tid, uint64_t *mach, int max);
++int
++sweet_task_thread_times(task_t task, uint64_t *tid, uint64_t *mach, int max)
++{
++	thread_t thread;
++	int n = 0;
++	task_lock(task);
++	queue_iterate(&task->threads, thread, thread_t, task_threads) {
++		if (n < max) {
++			tid[n] = thread_tid(thread);
++			mach[n] = recount_thread_time_mach(thread);
++			n++;
++		}
++	}
++	task_unlock(task);
++	return n;
++}
++void
++sweet_sample_task(const char *name, int pid, task_t task)
++{
++	vm_map_t map = get_task_map(task);
++	uint64_t slide = 0;
++	int tn = 0;
++	thread_t thread;
++	vm_shared_region_t sr = vm_shared_region_get(task);
++
++	if (sr != NULL) {
++		slide = sr->sr_slide;
++		vm_shared_region_deallocate(sr);
++	}
++	printf("SMP %s[%d] slide 0x%llx mh 0x%llx\n", name, pid, slide, task->mach_header_vm_address);
++
++	task_lock(task);
++	queue_iterate(&task->threads, thread, thread_t, task_threads) {
++		arm_saved_state_t *ss = find_user_regs(thread);
++		char line[400];
++		int n;
++		uint64_t fp;
++
++		if (ss == NULL || !is_saved_state64(ss)) {
++			continue;
++		}
++		fp = get_saved_state_fp(ss);
++		n = snprintf(line, sizeof(line), "SMP %s t%d pc 0x%llx lr 0x%llx sp 0x%llx bt", name, tn++,
++		    get_saved_state_pc(ss), get_saved_state_lr(ss), get_saved_state_sp(ss));
++		for (int i = 0; i < 16 && fp != 0 && (fp & 7) == 0 && n < (int)sizeof(line) - 20; i++) {
++			uint64_t frame[2];
++			if (vm_map_read_user(map, fp, frame, sizeof(frame)) != KERN_SUCCESS) {
++				break;
++			}
++			n += snprintf(line + n, sizeof(line) - n, " 0x%llx", frame[1]);
++			if (frame[0] <= fp) {
++				break;
++			}
++			fp = frame[0];
++		}
++		printf("%s\n", line);
++	}
++	task_unlock(task);
++}
++
++#endif /* ARM64_BOARD_CONFIG_SWEET */
++
+ kern_return_t
+ bsd_exception(
+ 	exception_type_t        exception,
+diff --git a/osfmk/kern/sched_dualq.c b/osfmk/kern/sched_dualq.c
+index 377af25..018ae2f 100644
+--- a/osfmk/kern/sched_dualq.c
++++ b/osfmk/kern/sched_dualq.c
+@@ -257,6 +257,41 @@ sched_dualq_choose_thread(
+ 		return run_queue_dequeue(chosen_runq, SCHED_HEADQ);
+ 	}
+ 
++#if defined(SWEET)
++	{
++		/*
++		 * SWEET: a little core (cpu0-5) leaves the window server's urgent threads -- CoreAnimation's
++		 * render thread -- to the big cores unless one has waited 4 ms for them: choose_processor()
++		 * sends them to a big core, but when both run something as urgent they wait in this queue,
++		 * and an idle little core took them, where a frame takes 2-3 times as long (30% of the
++		 * render thread's time in the frames that took over 14 ms, 4% in the others).
++		 * Boot-arg sweetbig_nosteal=0: as before.
++		 */
++		extern task_t sweet_window_server_task;
++		static int nosteal = -1;
++		static uint64_t patience;
++		if (nosteal < 0) {
++			int v = 2;
++			(void)PE_parse_boot_argn("sweetbig_nosteal", &v, sizeof(v));
++			nanoseconds_to_absolutetime(4 * NSEC_PER_MSEC, &patience);
++			nosteal = v;
++		}
++		/*
++		 * sweetbig_nosteal=2 (the default now): any thread at UI priority, not only the window server's --
++		 * SpringBoard's main thread builds each widget that scrolls into view (~80 ms of work), and 37% of
++		 * it ran on the little cores in those hitches against 15% otherwise. 1: the window server only.
++		 */
++		if (nosteal && processor->cpu_id < 6) {
++			thread_t head = run_queue_peek(main_runq);
++			if (head != THREAD_NULL && head->sched_pri >= 46 && head->sched_pri < BASEPRI_RTQUEUES &&
++			    (nosteal >= 2 || (sweet_window_server_task != TASK_NULL && get_threadtask(head) == sweet_window_server_task)) &&
++			    mach_absolute_time() - head->last_made_runnable_time < patience) {
++				return THREAD_NULL;
++			}
++		}
++	}
++#endif
++
+ #if CONFIG_SCHED_SMT
+ 	if (processor->is_SMT) {
+ 		thread_t potential_thread = run_queue_peek(chosen_runq);
+diff --git a/osfmk/kern/sched_prim.c b/osfmk/kern/sched_prim.c
+index b2aae03..3d65034 100644
+--- a/osfmk/kern/sched_prim.c
++++ b/osfmk/kern/sched_prim.c
+@@ -103,6 +103,7 @@
+ #include <kern/sched_common.h>
+ #include <kern/sched_rt.h>
+ #include <kern/sched.h>
++#include <pexpert/pexpert.h>
+ #include <kern/sfi.h>
+ #include <kern/syscall_subr.h>
+ #include <kern/task.h>
+@@ -4683,6 +4684,10 @@ choose_next_pset(
+  *
+  *  SMT-aware implementation of choose_processor.
+  */
++#if defined(SWEET)
++task_t sweet_window_server_task;        /* backboardd, once it opens the display (SweetFramebuffer.cpp) */
++#endif
++
+ processor_t
+ choose_processor_smt(
+ 	processor_set_t         starting_pset,
+@@ -4695,6 +4700,66 @@ choose_processor_smt(
+ 
+ 	assert(thread->sched_pri <= MAXPRI);
+ 
++#if defined(SWEET)
++	{
++		/*
++		 * SWEET (SM7150: cpu0-5 Cortex-A55, cpu6-7 Cortex-A76, all in one processor set here, so
++		 * the scheduler takes them for the same): what draws -- threads at UI priority and above,
++		 * below realtime, CoreAnimation's render thread among them -- gets a big core first: an
++		 * idle one, else one running something less urgent (which is preempted). Spread over
++		 * whichever core was idle, the render thread ran 91% of its time on the little cores,
++		 * 2-3 times slower, and a frame took ~20 ms of it. Boot-args: sweetbig=0 off,
++		 * sweetbig_cpu=N the first big core (6).
++		 */
++		static int big_first = -1;
++		static uint32_t big_cpu = 6;
++		if (big_first < 0) {
++			int v = 2;
++			(void)PE_parse_boot_argn("sweetbig", &v, sizeof(v));
++			(void)PE_parse_boot_argn("sweetbig_cpu", &big_cpu, sizeof(big_cpu));
++			big_first = v;
++		}
++		/*
++		 * And (sweetbig=2, the default): the window server's threads are such whatever their
++		 * priority (CoreAnimation's thread that takes the applications' commits was on the little
++		 * cores half the time, holding what the render thread waited for), and such a thread waits
++		 * for a big core rather than run on a little one when both are taken by others as urgent:
++		 * the render thread spent a quarter of its time on the little cores, where a frame takes
++		 * 2.5 times as long -- the frames shown twice in the widget panel and in Settings. It goes
++		 * to the big core running the least urgent thread (preempting it if less urgent than
++		 * itself, else queued there). sweetbig=1: only an idle big core, or a less urgent one.
++		 */
++		bool window_server = sweet_window_server_task != TASK_NULL && get_threadtask(thread) == sweet_window_server_task;
++		if (big_first && (thread->sched_pri >= 46 || (big_first == 2 && window_server && thread->sched_pri >= 20)) &&
++		    thread->sched_pri < BASEPRI_RTQUEUES) {
++			processor_t busy = PROCESSOR_NULL, least = PROCESSOR_NULL;
++			for (uint32_t cpu = big_cpu; cpu < MAX_SCHED_CPUS; cpu++) {
++				processor_t p = processor_array[cpu];
++				if (p == PROCESSOR_NULL || p->processor_set != pset || !p->is_recommended) {
++					continue;
++				}
++				if (p->state == PROCESSOR_IDLE) {
++					return p;
++				}
++				if ((p->state == PROCESSOR_RUNNING || p->state == PROCESSOR_DISPATCHING) && p->current_pri < thread->sched_pri &&
++				    (busy == PROCESSOR_NULL || p->current_pri < busy->current_pri)) {
++					busy = p;
++				}
++				if ((p->state == PROCESSOR_RUNNING || p->state == PROCESSOR_DISPATCHING) &&
++				    (least == PROCESSOR_NULL || p->current_pri < least->current_pri)) {
++					least = p;
++				}
++			}
++			if (busy != PROCESSOR_NULL) {
++				return busy;
++			}
++			if (big_first == 2 && least != PROCESSOR_NULL && window_server) {
++				return least;
++			}
++		}
++	}
++#endif
++
+ 	/*
+ 	 * Prefer the hinted processor, when appropriate.
+ 	 */
+diff --git a/osfmk/prng/prng_random.c b/osfmk/prng/prng_random.c
+index 504b3fa..d621920 100644
+--- a/osfmk/prng/prng_random.c
++++ b/osfmk/prng/prng_random.c
+@@ -226,6 +226,141 @@ early_random_init(void)
+ 	cc_clear(sizeof(earlyseed), earlyseed);
+ }
+ 
++
++#if defined(SWEET)
++/*
++ * The corecrypto kext normally installs the kernel PRNG. SWEET has no such
++ * kext: use the built-in HMAC-SHA256 DRBG, just as early_random does. A
++ * single mutex serializes generation and reseeding across all CPUs. This
++ * favors a small, auditable bring-up implementation over per-CPU scaling.
++ * This registers only the PRNG, not the unrelated g_crypto_funcs table.
++ */
++#include <kern/startup.h>
++
++static LCK_GRP_DECLARE(sweet_prng_group, "sweet-prng");
++static LCK_MTX_DECLARE(sweet_prng_lock, &sweet_prng_group);
++static struct cckprng_ctx sweet_prng_ctx;
++static const struct ccdrbg_nisthmac_custom sweet_prng_custom = {
++	.di = &ccsha256_ltc_di,
++	.strictFIPS = 0,
++};
++static cckprng_getentropy sweet_getentropy;
++static void *sweet_getentropy_arg;
++static unsigned sweet_max_ngens;
++static bool sweet_generators[MAX_CPUS];
++
++static struct ccdrbg_state *
++sweet_prng_state(struct cckprng_ctx *ctx)
++{
++	return (struct ccdrbg_state *)ctx->drbg_state;
++}
++
++static void
++sweet_prng_check(int status)
++{
++	if (status != CCDRBG_STATUS_OK) {
++		panic("SWEET HMAC DRBG error %d", status);
++	}
++}
++
++static void
++sweet_prng_init_with_getentropy(struct cckprng_ctx *ctx, unsigned max_ngens,
++    size_t seed_nbytes, const void *seed, size_t nonce_nbytes, const void *nonce,
++    cckprng_getentropy getentropy, void *getentropy_arg)
++{
++	assert(max_ngens > 0 && max_ngens <= MAX_CPUS);
++	ccdrbg_factory_nisthmac(&ctx->drbg_info, &sweet_prng_custom);
++	assert(ctx->drbg_info.size <= sizeof(ctx->drbg_state));
++	const char ps[] = "xnu sweet kernel random";
++	sweet_prng_check(ccdrbg_init(&ctx->drbg_info, sweet_prng_state(ctx),
++	    seed_nbytes, seed, nonce_nbytes, nonce, sizeof(ps) - 1, ps));
++	sweet_getentropy = getentropy;
++	sweet_getentropy_arg = getentropy_arg;
++	sweet_max_ngens = max_ngens;
++}
++
++static void
++sweet_prng_init(struct cckprng_ctx *ctx, size_t seed_nbytes, const void *seed,
++    size_t nonce_nbytes, const void *nonce, cckprng_getentropy getentropy,
++    void *getentropy_arg)
++{
++	sweet_prng_init_with_getentropy(ctx, MAX_CPUS, seed_nbytes, seed,
++	    nonce_nbytes, nonce, getentropy, getentropy_arg);
++}
++
++static void
++sweet_prng_initgen(__unused struct cckprng_ctx *ctx, unsigned gen_idx)
++{
++	lck_mtx_lock(&sweet_prng_lock);
++	assert(gen_idx < sweet_max_ngens);
++	assert(!sweet_generators[gen_idx]);
++	sweet_generators[gen_idx] = true;
++	lck_mtx_unlock(&sweet_prng_lock);
++}
++
++static void
++sweet_prng_reseed(struct cckprng_ctx *ctx, size_t nbytes, const void *seed)
++{
++	lck_mtx_lock(&sweet_prng_lock);
++	sweet_prng_check(ccdrbg_reseed(&ctx->drbg_info, sweet_prng_state(ctx),
++	    nbytes, seed, 0, NULL));
++	lck_mtx_unlock(&sweet_prng_lock);
++}
++
++static void
++sweet_prng_refresh(struct cckprng_ctx *ctx)
++{
++	/* The entropy callback also uses try-lock; refresh must not wait. */
++	if (!lck_mtx_try_lock(&sweet_prng_lock)) {
++		return;
++	}
++	uint8_t entropy[CCKPRNG_ENTROPY_SIZE];
++	size_t nbytes = sizeof(entropy);
++	int32_t nsamples = sweet_getentropy(&nbytes, entropy, sweet_getentropy_arg);
++	if (nsamples < 0) {
++		panic("SWEET PRNG entropy health test failed");
++	}
++	if (nsamples >= 256) {
++		assert(nbytes >= SEED_SIZE && nbytes <= sizeof(entropy));
++		sweet_prng_check(ccdrbg_reseed(&ctx->drbg_info, sweet_prng_state(ctx),
++		    nbytes, entropy, 0, NULL));
++	}
++	cc_clear(sizeof(entropy), entropy);
++	lck_mtx_unlock(&sweet_prng_lock);
++}
++
++static void
++sweet_prng_generate(struct cckprng_ctx *ctx, unsigned gen_idx,
++    size_t nbytes, void *out)
++{
++	assert(nbytes <= CCKPRNG_GENERATE_MAX_NBYTES);
++	lck_mtx_lock(&sweet_prng_lock);
++	assert(gen_idx < sweet_max_ngens && sweet_generators[gen_idx]);
++	sweet_prng_check(ccdrbg_generate(&ctx->drbg_info, sweet_prng_state(ctx),
++	    nbytes, out, 0, NULL));
++	lck_mtx_unlock(&sweet_prng_lock);
++}
++
++__startup_func
++static void
++sweet_prng_startup(void)
++{
++	/* Ensure the boot seed exists before registration erases the early DRBG. */
++	(void)early_random();
++	const struct cckprng_funcs funcs = {
++		.init = sweet_prng_init,
++		.initgen = sweet_prng_initgen,
++		.reseed = sweet_prng_reseed,
++		.refresh = sweet_prng_refresh,
++		.generate = sweet_prng_generate,
++		.init_with_getentropy = sweet_prng_init_with_getentropy,
++	};
++	register_and_init_prng(&sweet_prng_ctx, &funcs);
++	kprintf("SWEET PRNG: HMAC-SHA256 registered\n");
++}
++STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, sweet_prng_startup);
++#endif /* SWEET */
++
+ __static_testable void read_erandom(void * buf, size_t nbytes);
+ 
+ /*
+diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
+index 3ad743f..18abc37 100644
+--- a/pexpert/arm/pe_fiq.c
++++ b/pexpert/arm/pe_fiq.c
+@@ -3,11 +3,15 @@
+  */
+ 
+ #include <stdint.h>
++#include <stdbool.h>
++#include <libkern/section_keywords.h>
+ #include <arm64/proc_reg.h>
+ #include <kern/clock.h>
+ #include <mach/mach_time.h>
++#include <mach/kern_return.h>
+ #include <machine/atomic.h>
+ #include <machine/machine_routines.h>
++#include <os/atomic_private.h>
+ #include <pexpert/device_tree.h>
+ #include <pexpert/arm64/board_config.h>
+ 
+@@ -16,6 +20,11 @@
+ #define GICR_WAKE_TIMEOUT_NS (1000000000ULL) // timeout for redistributor wakeup (default 1s)
+ MACHINE_TIMEOUT(gicr_wake_timeout_ns, "gicr-wake-timeout", GICR_WAKE_TIMEOUT_NS, MACHINE_TIMEOUT_UNIT_NSEC, NULL);
+ 
++#if defined(SWEET)
++/* Phone default; QEMU virt wires the architected virtual timer to INTID 27. */
++SECURITY_READ_ONLY_LATE(uint32_t) sweet_vtimer_intid = SWEET_VTIMER_INTID;
++#endif
++
+ static vm_offset_t gicd_base;
+ static vm_offset_t gicr_base;
+ static vm_offset_t gicr_size;
+@@ -96,6 +105,23 @@ pe_init_fiq()
+ 			panic("%s: incorrect reg property size in GIC DT node; expecting 32 bytes but got %u bytes", __func__, prop_size);
+ 		}
+ 
++#if defined(SWEET)
++		/* Read only on the boot CPU, before the GIC and RO-late lockdown. */
++		void const *timer_prop;
++		unsigned int timer_size;
++		if (SecureDTGetProperty(entry, "virtual-timer-intid", &timer_prop, &timer_size) == kSuccess) {
++			if (timer_size != sizeof(uint32_t)) {
++				panic("%s: invalid virtual-timer-intid size %u", __func__, timer_size);
++			}
++			uint32_t intid = *(const uint32_t *)timer_prop;
++			if (intid < 16 || intid >= 32) {
++				panic("%s: virtual timer INTID %u is not a PPI", __func__, intid);
++			}
++			sweet_vtimer_intid = intid;
++		}
++		kprintf("SWEET GIC: virtual timer INTID %u\n", sweet_vtimer_intid);
++#endif
++
+ 		vm_offset_t soc_base_phys = pe_arm_get_soc_base_phys();
+ 
+ 		uint64_t const gicd_base_prop = ((uint64_t const *) prop)[0];
+@@ -141,11 +167,25 @@ pe_init_fiq()
+ 		}
+ 	}
+ 
++#if defined(SWEET)
++	/*
++	 * Real hardware with two security states: Group 0 is TrustZone's and
++	 * non-secure writes to it are ignored. Everything we own is Group 1 NS
++	 * and arrives as an IRQ (see sleh_irq). GICR_IGROUPR0 reads as zero
++	 * from the non-secure side even after this write; delivery still works.
++	 */
++	gicr_write32(GICR_IGROUPR0, 0xFFFFFFFF);
++	for (unsigned int i = 0; i < 32; i += 4) {
++		gicr_write32(GICR_IPRIORITYR0 + i, 0xA0A0A0A0);
++	}
++	gicr_write32(GICR_ISENABLER0, (1U << sweet_vtimer_intid) | (1U << SWEET_IPI_SGI));
++#else
+ 	// Configure timers and legacy FIQ to be group 0
+ 	gicr_write32(GICR_IGROUPR0, 0x81FFFFFF);
+ 
+ 	// Enable PPI 27
+ 	gicr_write32(GICR_ISENABLER0, (1 << 27));
++#endif /* SWEET */
+ 
+ 	// Enable system register access
+ 	uint64_t icc_sre = __builtin_arm_rsr64("ICC_SRE_EL1");
+@@ -153,8 +193,12 @@ pe_init_fiq()
+ 	__builtin_arm_wsr64("ICC_SRE_EL1", icc_sre);
+ 	__builtin_arm_isb(ISB_SY);
+ 
++#if defined(SWEET)
++	__builtin_arm_wsr64("ICC_BPR1_EL1", 0);
++#else
+ 	// Set priority masks and binary point for group 0
+ 	__builtin_arm_wsr64("ICC_BPR0_EL1", 0);
++#endif /* SWEET */
+ 	__builtin_arm_wsr64("ICC_PMR_EL1", 0xFF);
+ 
+ 	// Set EOI mode of this processor
+@@ -162,13 +206,181 @@ pe_init_fiq()
+ 	icc_ctlr &= ~ICC_CTLR_EOIMODE;
+ 	__builtin_arm_wsr64("ICC_CTLR_EL1", icc_ctlr);
+ 
++#if defined(SWEET)
++	// ABL leaves only ARE_NS set; Linux writes ARE_NS | EnableGrp1A | EnableGrp1
++	uint32_t gicd_ctlr = gicd_read32(GICD_CTLR);
++	gicd_ctlr |= GICD_CTLR_ARE_NS | GICD_CTLR_ENABLEGRP1A | GICD_CTLR_ENABLEGRP1;
++	gicd_write32(GICD_CTLR, gicd_ctlr);
++	while (gicd_read32(GICD_CTLR) & GICD_CTLR_RWP) {
++		;
++	}
++	__builtin_arm_wsr64("ICC_IGRPEN1_EL1", 1);
++	__builtin_arm_isb(ISB_SY);
++#else
+ 	// Enable the forwarding of the vtimer interrupt
+ 	uint32_t gicd_ctlr = gicd_read32(GICD_CTLR);
+ 	gicd_ctlr |= GICD_CTLR_ENABLEGRP0;
+ 	gicd_write32(GICD_CTLR, gicd_ctlr);
+ 	__builtin_arm_wsr64("ICC_IGRPEN0_EL1", 1);
+ 	__builtin_arm_isb(ISB_SY);
++#endif /* SWEET */
++}
++
++#if defined(SWEET)
++/* ---- SWEET: wired SPI delivery to in-kernel drivers (the WiFi radio's CE completions) ----------
++ * Open-source XNU has no interrupt-controller driver: sleh_irq hands any device interrupt (intid
++ * >= 16 that is not the timer or an IPI) to this processor's cpu_data interrupt_handler -- which
++ * nothing installs, so the interrupt is dropped and drivers would have to poll. Here a driver claims
++ * its SPI: it is configured in the GIC distributor (group 1 NS, edge/level, a deliverable priority,
++ * routed to one processor) and enabled, and its handler runs from sleh_irq for each one that fires.
++ * The first attach installs a single dispatcher as that processor's interrupt_handler and pins every
++ * SPI to that processor. This lets the WiFi glue take real CE interrupts instead of polling the CE
++ * registers every 1 ms (which wedged the bus when the radio's clocks were gated in power-save). */
++
++#define SGIC_IGROUPR(n)    (0x0080 + 4 * (n))
++#define SGIC_ISENABLER(n)  (0x0100 + 4 * (n))
++#define SGIC_ICENABLER(n)  (0x0180 + 4 * (n))
++#define SGIC_ICPENDR(n)    (0x0280 + 4 * (n))
++#define SGIC_ICACTIVER(n)  (0x0380 + 4 * (n))
++#define SGIC_IPRIORITYR(n) (0x0400 + (n))
++#define SGIC_ICFGR(n)      (0x0c00 + 4 * (n))
++#define SGIC_IGRPMODR(n)   (0x0d00 + 4 * (n))
++#define SGIC_IROUTER(n)    (0x6000 + 8 * (n))
++
++#define SGIC_SPI_MIN       32u
++#define SGIC_SPI_MAX       1020u
++#define SGIC_SPI_PRIORITY  0xA0            /* below ICC_PMR_EL1 (0xFF): deliverable, as timer/IPI */
++#define SGIC_SPI_SLOTS     16
++
++static struct sgic_spi {
++	uint32_t intid;                        /* 0 = free slot */
++	void   (*handler)(void *context, uint32_t intid);
++	void    *context;
++	uint64_t count;
++} sgic_spi[SGIC_SPI_SLOTS];
++static bool     sgic_handler_installed;
++static uint64_t sgic_target_mpidr;             /* the processor every SPI is routed to */
++
++/* From sleh_irq (via the processor's interrupt_handler) in interrupt context: run the attached
++ * handler for this intid. Returns true if it was one of ours. */
++bool
++sweet_gic_spi_dispatch(uint32_t intid)
++{
++	for (unsigned i = 0; i < SGIC_SPI_SLOTS; i++) {
++		if (os_atomic_load(&sgic_spi[i].intid, acquire) == intid) {
++			sgic_spi[i].count++;
++			if (sgic_spi[i].handler != NULL) {
++				sgic_spi[i].handler(sgic_spi[i].context, intid);
++			}
++			return true;
++		}
++	}
++	return false;
++}
++
++static void
++sweet_spi_platform_handler(void *target, void *refCon, void *nub, int source)
++{
++	(void)target; (void)refCon; (void)nub;
++	(void)sweet_gic_spi_dispatch((uint32_t)source);
++}
++
++void
++sweet_gic_spi_mask(uint32_t intid)
++{
++	if (gicd_base != 0 && intid >= SGIC_SPI_MIN && intid < SGIC_SPI_MAX) {
++		gicd_write32(SGIC_ICENABLER(intid / 32), 1u << (intid % 32));
++	}
++}
++
++void
++sweet_gic_spi_unmask(uint32_t intid)
++{
++	if (gicd_base != 0 && intid >= SGIC_SPI_MIN && intid < SGIC_SPI_MAX) {
++		gicd_write32(SGIC_ISENABLER(intid / 32), 1u << (intid % 32));
++	}
++}
++
++kern_return_t
++sweet_gic_spi_attach(uint32_t intid, bool edge, void (*handler)(void *context, uint32_t intid), void *context)
++{
++	struct sgic_spi *slot = NULL;
++	uint32_t config;
++
++	if (gicd_base == 0 || intid < SGIC_SPI_MIN || intid >= SGIC_SPI_MAX || handler == NULL) {
++		return KERN_INVALID_ARGUMENT;
++	}
++	for (unsigned i = 0; i < SGIC_SPI_SLOTS; i++) {
++		if (sgic_spi[i].intid == intid) {
++			return KERN_NAME_EXISTS;
++		}
++		if (slot == NULL && sgic_spi[i].intid == 0) {
++			slot = &sgic_spi[i];
++		}
++	}
++	if (slot == NULL) {
++		return KERN_RESOURCE_SHORTAGE;
++	}
++
++	/* Install the dispatcher on this processor the first time, and remember it so every SPI is
++	 * routed here (interrupts off pins us to this processor while we read its MPIDR + install). */
++	if (!sgic_handler_installed) {
++		boolean_t istate = ml_set_interrupts_enabled(FALSE);
++		sgic_target_mpidr = __builtin_arm_rsr64("MPIDR_EL1");
++		ml_install_interrupt_handler(NULL, 0, NULL, (IOInterruptHandler)sweet_spi_platform_handler, NULL);
++		sgic_handler_installed = true;
++		(void)ml_set_interrupts_enabled(istate);
++	}
++
++	slot->handler = handler;
++	slot->context = context;
++	slot->count = 0;
++	os_atomic_store(&slot->intid, intid, release);
++
++	sweet_gic_spi_mask(intid);
++	gicd_write32(SGIC_ICPENDR(intid / 32), 1u << (intid % 32));
++	gicd_write32(SGIC_ICACTIVER(intid / 32), 1u << (intid % 32));
++	gicd_write32(SGIC_IGROUPR(intid / 32), gicd_read32(SGIC_IGROUPR(intid / 32)) | 1u << (intid % 32));
++	gicd_write32(SGIC_IGRPMODR(intid / 32), gicd_read32(SGIC_IGRPMODR(intid / 32)) & ~(1u << (intid % 32)));
++	*(volatile uint8_t *)(gicd_base + SGIC_IPRIORITYR(intid)) = SGIC_SPI_PRIORITY;
++	config = gicd_read32(SGIC_ICFGR(intid / 16)) & ~(3u << (intid % 16 * 2));
++	gicd_write32(SGIC_ICFGR(intid / 16), config | (edge ? 2u : 0u) << (intid % 16 * 2));
++	/* GICD_IROUTER: Aff3 in [39:32], Aff2.Aff1.Aff0 in [23:0]; bit 31 (any processor) left clear. */
++	*(volatile uint64_t *)(gicd_base + SGIC_IROUTER(intid)) =
++	    (sgic_target_mpidr & 0xff00000000ull) | (sgic_target_mpidr & 0xffffff);
++	while (gicd_read32(GICD_CTLR) & GICD_CTLR_RWP) {
++		;
++	}
++	sweet_gic_spi_unmask(intid);
++	return KERN_SUCCESS;
++}
++
++void
++sweet_gic_spi_detach(uint32_t intid)
++{
++	sweet_gic_spi_mask(intid);
++	if (gicd_base != 0 && intid >= SGIC_SPI_MIN && intid < SGIC_SPI_MAX) {
++		gicd_write32(SGIC_ICPENDR(intid / 32), 1u << (intid % 32));
++	}
++	for (unsigned i = 0; i < SGIC_SPI_SLOTS; i++) {
++		if (sgic_spi[i].intid == intid) {
++			sgic_spi[i].handler = NULL;
++			os_atomic_store(&sgic_spi[i].intid, 0, release);
++		}
++	}
++}
++
++uint64_t
++sweet_gic_spi_count(uint32_t intid)
++{
++	for (unsigned i = 0; i < SGIC_SPI_SLOTS; i++) {
++		if (sgic_spi[i].intid == intid) {
++			return sgic_spi[i].count;
++		}
++	}
++	return 0;
+ }
++#endif /* SWEET */
+ #else
+ void
+ pe_init_fiq()
+diff --git a/pexpert/arm/pe_serial.c b/pexpert/arm/pe_serial.c
+index 032d9e0..142fab5 100644
+--- a/pexpert/arm/pe_serial.c
++++ b/pexpert/arm/pe_serial.c
+@@ -26,6 +26,7 @@
+ #include <pexpert/arm/consistent_debug.h>
+ #include <pexpert/arm64/board_config.h>
+ #include <arm64/proc_reg.h>
++#include <arm64/sweet_early.h>
+ #include <pexpert/arm/protos.h>
+ #include <kern/sched_prim.h>
+ #ifdef PL011_UART
+@@ -751,6 +752,150 @@ static void uart_puts_force_poll_device(
+ 	const char *str,
+ 	struct pe_serial_functions *fns);
+ 
++/*****************************************************************************/
++
++/*
++ * sweet: framebuffer "serial" for boards with no usable UART (the Redmi Note
++ * 10 Pro's debug UART engine runs in SPI mode). kprintf output is drawn onto
++ * the boot framebuffer described by the ADT node "sweet-fbcon":
++ *   reg    = <phys size>       absolute physical address, not arm-io relative
++ *   width, height              pixels
++ *   stride                     bytes per line, 32bpp
++ * Lines wrap back to the top instead of scrolling; the line after the cursor
++ * is kept blank so the newest output is easy to find.
++ */
++
++extern unsigned char iso_font[256 * 16];
++
++#define FBCON_SCALE     2
++#define FBCON_FG        0xffffffffu
++#define FBCON_BG        0xff000000u
++
++volatile uint32_t *fbcon_base;
++uint32_t fbcon_width, fbcon_height, fbcon_stride;
++static uint32_t fbcon_cols, fbcon_rows, fbcon_col, fbcon_row;
++
++static void
++fbcon_clear_row(uint32_t row)
++{
++	for (uint32_t y = row * 16 * FBCON_SCALE; y < (row + 1) * 16 * FBCON_SCALE; y++) {
++		volatile uint32_t *line = fbcon_base + y * (fbcon_stride / 4);
++		for (uint32_t x = 0; x < fbcon_width; x++) {
++			line[x] = FBCON_BG;
++		}
++	}
++}
++
++static void
++fbcon_newline(void)
++{
++	fbcon_col = 0;
++	fbcon_row = (fbcon_row + 1) % fbcon_rows;
++	fbcon_clear_row(fbcon_row);
++	fbcon_clear_row((fbcon_row + 1) % fbcon_rows);
++}
++
++static void
++fbcon_init(void)
++{
++	fbcon_cols = fbcon_width / (8 * FBCON_SCALE);
++	fbcon_rows = fbcon_height / (16 * FBCON_SCALE);
++	fbcon_col = fbcon_row = 0;
++	for (uint32_t r = 0; r < fbcon_rows; r++) {
++		fbcon_clear_row(r);
++	}
++}
++
++static unsigned int
++fbcon_transmit_ready(void)
++{
++	return 1;
++}
++
++static void
++fbcon_transmit_data(uint8_t c)
++{
++	if (c == '\r') {
++		fbcon_col = 0;
++		return;
++	}
++	if (c == '\n') {
++		fbcon_newline();
++		return;
++	}
++	if (fbcon_col >= fbcon_cols) {
++		fbcon_newline();
++	}
++	const unsigned char *glyph = iso_font + c * 16;
++	uint32_t x0 = fbcon_col * 8 * FBCON_SCALE, y0 = fbcon_row * 16 * FBCON_SCALE;
++	for (uint32_t gy = 0; gy < 16; gy++) {
++		for (uint32_t sy = 0; sy < FBCON_SCALE; sy++) {
++			volatile uint32_t *line = fbcon_base + (y0 + gy * FBCON_SCALE + sy) * (fbcon_stride / 4) + x0;
++			for (uint32_t gx = 0; gx < 8; gx++) {
++				uint32_t px = (glyph[gy] & (1u << gx)) ? FBCON_FG : FBCON_BG;
++				for (uint32_t sx = 0; sx < FBCON_SCALE; sx++) {
++					line[gx * FBCON_SCALE + sx] = px;
++				}
++			}
++		}
++	}
++	fbcon_col++;
++}
++
++static unsigned int
++fbcon_receive_ready(void)
++{
++	return 0;
++}
++
++static uint8_t
++fbcon_receive_data(void)
++{
++	return 0;
++}
++
++SECURITY_READ_ONLY_LATE(static struct pe_serial_functions) sweet_fbcon_serial_functions =
++{
++	.init = fbcon_init,
++	.transmit_ready = fbcon_transmit_ready,
++	.transmit_data = fbcon_transmit_data,
++	.receive_ready = fbcon_receive_ready,
++	.receive_data = fbcon_receive_data,
++	.device = SERIAL_SWEET_FBCON
++};
++
++static void
++fbcon_probe(void)
++{
++	DTEntry entry;
++	uint64_t const *reg;
++	uint32_t const *val;
++	unsigned int size;
++
++	if (SecureDTFindEntry("name", "sweet-fbcon", &entry) != kSuccess ||
++	    SecureDTGetProperty(entry, "reg", (void const **)&reg, &size) != kSuccess || size < 16) {
++		return;
++	}
++	if (SecureDTGetProperty(entry, "width", (void const **)&val, &size) == kSuccess) {
++		fbcon_width = *val;
++	}
++	if (SecureDTGetProperty(entry, "height", (void const **)&val, &size) == kSuccess) {
++		fbcon_height = *val;
++	}
++	if (SecureDTGetProperty(entry, "stride", (void const **)&val, &size) == kSuccess) {
++		fbcon_stride = *val;
++	}
++	if (!fbcon_width || !fbcon_height || fbcon_stride < fbcon_width * 4) {
++		return;
++	}
++	sweet_early_mark(17, "fbcon config read; mapping");
++	fbcon_base = (volatile uint32_t *)ml_io_map_wcomb(reg[0], reg[1]);
++	sweet_early_mark(18, "fbcon mapping returned");
++	if (fbcon_base != NULL) {
++		register_serial_functions(&sweet_fbcon_serial_functions);
++	}
++}
++
+ #if HIBERNATION
+ /**
+  * Transitions the serial driver into a mode that can be run in the hibernation
+@@ -908,10 +1053,18 @@ serial_init(void)
+ 
+ 	PE_parse_boot_argn("disable-uart-irq", &disable_uart_irq, sizeof(disable_uart_irq));
+ 
++	fbcon_probe();
++
+ 	// Get the phandle of the serial device XNU has been configured to use.
+ 	uint32_t phandle;
+ 	if (!get_serial_device_phandle(&phandle)) {
+ 		// XNU has not been configured to use a serial device; return early.
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++		/* SWEET: no UART, only the framebuffer console fbcon_probe() registered */
++		if (gPESF != NULL) {
++			goto sweet_init_functions;
++		}
++#endif
+ 		return 0;
+ 	}
+ 
+@@ -940,6 +1093,9 @@ serial_init(void)
+ 		panic("Unable to find serial device driver for '%s'", compatible);
+ 	}
+ 
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++sweet_init_functions:
++#endif
+ 	fns = gPESF;
+ 	while (fns != NULL) {
+ 		serial_do_transmit = 1;
+diff --git a/pexpert/pexpert/arm/protos.h b/pexpert/pexpert/arm/protos.h
+index f8fcbc2..d295743 100644
+--- a/pexpert/pexpert/arm/protos.h
++++ b/pexpert/pexpert/arm/protos.h
+@@ -37,6 +37,9 @@ void uart_putc_options(char, bool);
+ int uart_getc(void);
+ 
+ void pe_init_fiq(void);
++#if defined(ARM64_BOARD_CONFIG_SWEET)
++extern uint32_t sweet_vtimer_intid;
++#endif
+ 
+ #ifdef PRIVATE
+ /**
+@@ -47,7 +50,8 @@ typedef enum serial_device {
+ 	SERIAL_APPLE_UART=0x1,
+ 	SERIAL_DOCKCHANNEL=0x2,
+ 	SERIAL_PL011_UART=0x4,
+-	SERIAL_DCC_UART=0x8
++	SERIAL_DCC_UART=0x8,
++	SERIAL_SWEET_FBCON=0x10
+ } serial_device_t;
+ 
+ kern_return_t serial_irq_enable(serial_device_t device);
+diff --git a/pexpert/pexpert/arm64/Makefile b/pexpert/pexpert/arm64/Makefile
+index 75938b5..1561d80 100644
+--- a/pexpert/pexpert/arm64/Makefile
++++ b/pexpert/pexpert/arm64/Makefile
+@@ -33,7 +33,8 @@ PRIVATE_KERNELFILES = \
+ 	H15.h \
+ 	H16.h \
+ 	H17.h \
+-	VMAPPLE.h
++	VMAPPLE.h \
++	SWEET.h
+ 
+ 
+ # Headers installed into System.framework/PrivateHeaders (userspace internal SDK only).
+diff --git a/pexpert/pexpert/arm64/board_config.h b/pexpert/pexpert/arm64/board_config.h
+index 5a6cd33..56b5fdc 100644
+--- a/pexpert/pexpert/arm64/board_config.h
++++ b/pexpert/pexpert/arm64/board_config.h
+@@ -304,6 +304,17 @@
+ 
+ 
+ 
++#ifdef ARM64_BOARD_CONFIG_SWEET
++#include <pexpert/arm64/SWEET.h>
++
++#define MAX_L2_CLINE                   6
++#define MAX_CPUS                       8
++#define MAX_CPU_CLUSTERS               1
++
++#define CORE_NCTRS                     8 /* Placeholder; KPC is not enabled for this target */
++
++#endif  /* ARM64_BOARD_CONFIG_SWEET */
++
+ #ifdef ARM64_BOARD_CONFIG_VMAPPLE
+ #include <pexpert/arm64/VMAPPLE.h>
+ 

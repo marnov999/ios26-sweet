@@ -46,6 +46,14 @@ A76 lacks (FCMA, LRCPC2, BF16, MOPS, ...); how many of them are real code, and w
 4. launchd, backboardd, SpringBoard; then Metal for the window server.
 5. raphael.
 
+## Layout
+
+- `xnu/patches/`: what CI puts on Apple's xnu-12377.121.6 (blacktop/darwin-xnu-build, `MACOS_VERSION=26.5`,
+  `MACHINE_CONFIG=SWEET`): `0019`/`0020`/`0026-stage-*.sh` fetch libpthread-539.100.4, BearSSL and hfs-715.120.4
+  (the macOS 26.5 versions); `0100-sweet-new-files.patch` our drivers and other new files; `0101-sweet-apple-edits.patch`
+  our changes to Apple's files.
+- `.github/workflows/xnu.yml`: the build (macos-latest, Xcode 26); artifacts `xnu-kernel` and `xnu-buildtree`.
+
 ## Not included
 
 No binaries or firmware of Apple, Qualcomm or Xiaomi.
